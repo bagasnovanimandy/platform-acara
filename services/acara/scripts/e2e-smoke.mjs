@@ -453,6 +453,23 @@ check(
   await waitFor(async () => (await pvLansia()) === sebelum + (punyaLansia ? -1 : 1)),
 );
 
+// --- Statistik dashboard
+const dSel = await api('GET', '/dashboard/acara', { token: adminSelatan });
+const dSa = (await api('GET', '/dashboard/acara', { token: sa })).json;
+check(
+  'statistik acara sesuai wilayah',
+  dSel.status === 200 &&
+    dSel.json.perBulan.length === 12 &&
+    dSel.json.total >= 2 &&
+    dSa.total >= dSel.json.total &&
+    Object.values(dSel.json.status).reduce((a, b) => a + b, 0) === dSel.json.total,
+  JSON.stringify(dSel.json).slice(0, 200),
+);
+check(
+  'auditor bisa melihat statistik acara',
+  (await api('GET', '/dashboard/acara', { token: auditor })).status === 200,
+);
+
 // --- Hapus (soft)
 check(
   'hapus acara',

@@ -66,6 +66,7 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `POST /acara/:id/pj`, `DELETE /acara/:id/pj/:pjId`
 - `GET|POST /acara/:id/foto`, `GET /foto/:id/file?thumb=1`, `DELETE /foto/:id`
 - `GET /anggota/:id/acara` (acara yang diikuti), `GET /anggota-ref/cari?q=`
+- `GET /dashboard/acara` (statistik acara sesuai wilayah)
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.
