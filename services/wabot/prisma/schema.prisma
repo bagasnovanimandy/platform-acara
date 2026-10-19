@@ -4,7 +4,10 @@
 // Auth state Baileys disimpan di volume file (/data/wa-auth).
 
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  importFileExtension = "js"
 }
 
 datasource db {
