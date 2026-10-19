@@ -54,6 +54,7 @@ Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi ol
 - `GET|POST|PATCH /kategori` (ubah: SUPER_ADMIN / admin daerah)
 - `GET|POST|PATCH /users` (SUPER_ADMIN semua; ADMIN untuk pengguna di dalam wilayahnya)
 - `GET /audit` (riwayat perubahan; ADMIN, AUDITOR, sesuai wilayah)
+- `GET /dashboard/ringkasan` (ADMIN, PENGURUS, AUDITOR), `GET /dashboard/audit` (ADMIN, AUDITOR); sesuai wilayah
 - `GET /internal/anggota?ids=…`, `GET /internal/setting?prefix=…` (header `x-internal-key`)
 
 Error selalu `{ code, message, details? }`.
