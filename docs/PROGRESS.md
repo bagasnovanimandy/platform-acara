@@ -5,7 +5,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 ## Status fase
 - [x] 0. Fondasi
 - [x] 1. Core
-- [ ] 2. Acara — tahap A (kategori, auditor, riwayat, admin bertingkat) selesai; tahap B (layanan acara + halaman acara) dan dashboard admin & auditor selesai; statistik acara di dashboard menyusul
+- [x] 2. Acara (tahap A kategori/auditor/admin bertingkat, tahap B acara, dashboard admin & auditor, statistik acara)
 - [ ] 3. Absensi offline
 - [ ] 4. Operator & monitoring
 - [ ] 5. Enrollment & verifikasi
@@ -22,6 +22,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - 2026-10-19 — 2A — Permintaan pemilik: kategori jadi tabel `Kategori` (dikelola admin, 9 kategori awal) dan relasi banyak-ke-banyak `AnggotaKategori`; migrasi memindahkan isi kolom lama. Peran `AUDITOR` (lihat saja). `AuditLog` dicatat untuk perubahan anggota, wali, wilayah, kategori, dan pengguna, dengan wilayah untuk filter scope; `GET /audit` dan `GET /anggota/:id/riwayat`. Admin bertingkat: ADMIN mengelola pengguna di dalam wilayahnya. Web: halaman Kategori, detail anggota (profil, wali, riwayat pindah, riwayat perubahan), Pengguna, Riwayat; pilihan banyak kategori di form, tabel, filter, dan import (dipisah koma). Seed: contoh admin daerah, admin desa, auditor. Diverifikasi: 40 unit test core, `test:e2e` 51 skenario, uji browser 27 skenario.
 - 2026-10-19 — 2B — acara-svc: verifikasi JWT core lewat JWKS, scope dari `GET /internal/users/:id/scope`, salinan anggota `AnggotaRef` (event `anggota.upserted` + resync saat start, membawa `updatedAt`). Acara bertingkat KELOMPOK/DESA/DAERAH/GABUNGAN; peserta = wilayah × kategori (kode, kosong = semua) × jenis kelamin, dengan preview jumlah. Sesi, rundown (urutan bisa digeser), pengisi (anggota atau nama bebas), PJ, foto kegiatan (WebP maks 1600 px + thumbnail 320 px). Web: daftar & kalender acara, form dengan preview peserta langsung, detail (sesi & rundown, peserta, PJ, foto), cetak rundown, acara yang diikuti di profil anggota. Diverifikasi: `test:e2e` acara 45 skenario, uji browser 23 skenario.
 - 2026-10-19 — 2C — Dashboard di `/admin` (menu pertama, tujuan setelah login). Core: modul `dashboard`, `GET /dashboard/ringkasan` (ADMIN/PENGURUS/AUDITOR) dan `GET /dashboard/audit` (ADMIN/AUDITOR), agregasi di fungsi murni, sesuai scope wilayah. Web admin/pengurus: angka utama, gauge kelengkapan data, sebaran kategori, desa → kelompok (klik membuka daftar anggota terfilter), anggota baru per bulan, mutasi masuk/keluar, tempat kehadiran (menunggu fase 3); admin juga punya tab Aktivitas. Auditor: perubahan per hari, siapa mengubah, apa yang diubah, perubahan terbaru (tautan ke detail anggota), gauge kelengkapan. recharts + motion (muncul saat di-scroll, angka menghitung naik, menghormati reduced motion), tombol Tabel di tiap grafik. Daftar anggota membaca `?desaId=`/`?kelompokId=`. Diverifikasi: 50 unit test core (10 baru), `test:e2e` 55 skenario, uji browser 32 skenario (desktop & 390px).
+- 2026-10-19 — 2D — Statistik acara di dashboard: acara-svc `GET /dashboard/acara` (ADMIN/PENGURUS/AUDITOR, sesuai visibilitas acara): acara bulan ini, akan datang, total acara & sesi, acara per bulan (6 lalu–5 ke depan, WIB, tanpa BATAL), 5 acara terdekat. Web: bagian "Acara" di dashboard admin/pengurus. Diverifikasi: 3 unit test baru, `test:e2e` acara 47 skenario, cek browser.
 
 ## Keputusan
 <!-- keputusan baru yang tidak ada di HANDOVER, beserta alasannya -->
@@ -60,6 +61,6 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 ## Tertunda / masalah
 - Skema wabot belum punya migrasi (fase 7). Model acara untuk fase 3–6 (operator, absensi, wajah, rekap) sudah ikut migrasi awal acara dan bisa berubah.
 - Belum ada UI untuk wali (API sudah ada). Belum ada rate limit login.
-- Riwayat kehadiran per anggota menunggu fase 3. Statistik acara di dashboard ditambahkan setelah PR dashboard digabung.
+- Riwayat kehadiran per anggota menunggu fase 3.
 - shadcn/ui di-init manual (components.json, `cn()`, Button); komponen lain ditambah dengan `pnpm dlx shadcn@latest add <nama>` dari apps/web.
 - Celah skema untuk fase 2–6: `Tamu` belum berelasi ke `Sesi`; `Absensi.faceDataId` belum punya foreign key ke `FaceData`.

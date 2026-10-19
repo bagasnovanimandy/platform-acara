@@ -9,6 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import type { AktivitasAudit, Ringkasan } from '@/lib/dashboard-types';
 import { formatWaktu } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { AcaraStats } from './acara-stats';
 import { StatTile } from './chart-card';
 import {
   AktivitasChart,
@@ -170,6 +171,10 @@ export function AdminDashboard() {
             <MutasiChart data={r.pertumbuhan} />
           </RevealItem>
         </Reveal>
+      </Section>
+
+      <Section title="Acara" description="Acara yang diselenggarakan atau diikuti wilayah Anda.">
+        <AcaraStats />
       </Section>
 
       <Section title="Kehadiran">
