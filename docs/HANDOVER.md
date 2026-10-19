@@ -129,9 +129,9 @@ Draft lengkap ada di `services/*/prisma/schema.prisma`.
 
 ### acara_db
 - **AnggotaRef**: salinan ringkas anggota dari core.
-- **Acara** → **Sesi** → **RundownItem** (+ **Pengisi** per item).
+- **Acara** → **Sesi** → **RundownItem** (+ **Pengisi** per item). Acara punya `tingkat`: KELOMPOK, DESA, DAERAH, atau GABUNGAN (beberapa desa/kelompok dalam satu daerah). Penyelenggara = wilayah terkecil yang mencakup semua wilayah peserta; hanya admin di wilayah itu yang bisa mengubah.
 - **AcaraPJ**: penanggung jawab acara (peran: PJ_UMUM, PJ_IZIN, dll).
-- **PesertaRule**: aturan peserta target (filter wilayah, jenis kelamin, kategori generus). Hasilnya di-*snapshot* ke **PesertaSesi** saat sesi dibuka, supaya rekap tidak berubah walau data anggota berubah.
+- **PesertaRule**: aturan peserta target, satu baris per wilayah yang ikut, dengan filter jenis kelamin dan kategori (boleh beberapa; kosong = semua). Hasilnya di-*snapshot* ke **PesertaSesi** saat sesi dibuka, supaya rekap tidak berubah walau data anggota berubah.
 - **FotoKegiatan**.
 - **OperatorSession**: operator sementara per sesi (label pintu, PIN hash, token, `expiresAt`, `revokedAt`, `lastSeenAt`, `lastScanAt`, info perangkat).
 - **Absensi**: unik `(sesiId, anggotaId)`; `metode` (WAJAH/MANUAL/TAMU), `operatorSessionId`, `capturedAt` (waktu di perangkat), `syncedAt`, `clientId` (UUID dari perangkat, idempoten), `faceDistance?`.
@@ -339,6 +339,6 @@ Kerjakan **berurutan**. Fase 3 boleh dimulai paralel dengan fase 2 karena packag
 - WA via Baileys, menu teks bernomor.
 
 ## 11. Pertanyaan terbuka
-- Apakah satu acara bisa lintas desa/daerah dengan admin berbeda? (Asumsi awal: ya, via PesertaRule + scope penyelenggara.)
+- Apakah satu acara bisa lintas desa/daerah dengan admin berbeda? (Lintas desa: ya, penyelenggara = daerah. Lintas daerah: belum didukung.)
 - Siapa default PJ_IZIN bila acara tidak menetapkan.
 - Format kode anggota (asumsi: `<kode desa>-<nomor urut 4 digit>`).

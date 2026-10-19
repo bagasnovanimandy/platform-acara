@@ -5,7 +5,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 ## Status fase
 - [x] 0. Fondasi
 - [x] 1. Core
-- [ ] 2. Acara — tahap A (kategori, auditor, riwayat, admin bertingkat) selesai; tahap B (acara + dashboard) belum
+- [ ] 2. Acara — tahap A (kategori, auditor, riwayat, admin bertingkat) selesai; tahap B (layanan acara + halaman acara) selesai; dashboard admin & auditor di PR terpisah
 - [ ] 3. Absensi offline
 - [ ] 4. Operator & monitoring
 - [ ] 5. Enrollment & verifikasi
@@ -20,6 +20,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - 2026-10-19 — 1 — core-svc: login argon2 + JWT RS256 (access 15 mnt, refresh 7 hari via cookie httpOnly), JWKS, /auth/me; guard role + scope wilayah; CRUD daerah/desa/kelompok, anggota (filter wilayah, cari, pagination, kode otomatis), wali, mutasi; import xlsx dengan dry-run; event anggota.upserted/anggota.mutasi ke BullMQ; /internal/anggota & /internal/setting; users (SUPER_ADMIN); migrasi pertama core_db; seed. Web: /login, /admin/anggota (tabel, filter bertingkat, tambah/ubah, pindah kelompok), /admin/anggota/import (pratinjau), /admin/wilayah. Diverifikasi: 34 unit test; `test:e2e` 32 skenario (admin desa hanya melihat desanya, import 100 anggota dari Excel); uji browser Playwright 17 skenario.
 - 2026-10-19 — 1 — Kategori generus jadi kolom manual `Anggota.kategori` (enum CABERAWIT/PRAREMAJA/REMAJA/USIA_NIKAH, boleh kosong), bukan dihitung dari umur; Setting batas usia dihapus dari seed. Ikut di DTO, filter `?kategori=` (termasuk `BELUM`), kolom import "Kategori" (opsional, dropdown di template), payload `anggota.upserted`, dan web (pilihan kategori di form, badge di tabel, filter, pratinjau import). Diverifikasi: unit test, `test:e2e` 37 skenario, uji browser 20 skenario.
 - 2026-10-19 — 2A — Permintaan pemilik: kategori jadi tabel `Kategori` (dikelola admin, 9 kategori awal) dan relasi banyak-ke-banyak `AnggotaKategori`; migrasi memindahkan isi kolom lama. Peran `AUDITOR` (lihat saja). `AuditLog` dicatat untuk perubahan anggota, wali, wilayah, kategori, dan pengguna, dengan wilayah untuk filter scope; `GET /audit` dan `GET /anggota/:id/riwayat`. Admin bertingkat: ADMIN mengelola pengguna di dalam wilayahnya. Web: halaman Kategori, detail anggota (profil, wali, riwayat pindah, riwayat perubahan), Pengguna, Riwayat; pilihan banyak kategori di form, tabel, filter, dan import (dipisah koma). Seed: contoh admin daerah, admin desa, auditor. Diverifikasi: 40 unit test core, `test:e2e` 51 skenario, uji browser 27 skenario.
+- 2026-10-19 — 2B — acara-svc: verifikasi JWT core lewat JWKS, scope dari `GET /internal/users/:id/scope`, salinan anggota `AnggotaRef` (event `anggota.upserted` + resync saat start, membawa `updatedAt`). Acara bertingkat KELOMPOK/DESA/DAERAH/GABUNGAN; peserta = wilayah × kategori (kode, kosong = semua) × jenis kelamin, dengan preview jumlah. Sesi, rundown (urutan bisa digeser), pengisi (anggota atau nama bebas), PJ, foto kegiatan (WebP maks 1600 px + thumbnail 320 px). Web: daftar & kalender acara, form dengan preview peserta langsung, detail (sesi & rundown, peserta, PJ, foto), cetak rundown, acara yang diikuti di profil anggota. Diverifikasi: `test:e2e` acara 45 skenario, uji browser 23 skenario.
 
 ## Keputusan
 <!-- keputusan baru yang tidak ada di HANDOVER, beserta alasannya -->
@@ -47,10 +48,15 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - Admin bertingkat: ADMIN mengelola pengguna yang seluruh wilayahnya di dalam wilayah ADMIN itu (termasuk sesama admin di tingkat yang sama), dan hanya memberi wilayah di dalamnya.
 - Komponen shadcn/ui ditulis manual (registry tidak bisa diakses dari lingkungan build); Select memakai `<select>` bawaan agar ringan di HP.
 - Pesan validasi zod memakai locale Indonesia.
+- Penyelenggara acara = wilayah terkecil yang mencakup semua wilayah peserta; hanya ADMIN di wilayah penyelenggara yang bisa mengubah. Acara terlihat bila penyelenggara atau salah satu wilayah peserta bersinggungan dengan wilayah user (auditor & pengurus hanya lihat).
+- Acara gabungan lintas daerah belum didukung (ditolak `WILAYAH_INVALID`); gabungan boleh campur desa dan kelompok.
+- Aturan peserta disimpan satu baris `PesertaRule` per wilayah dengan kategori & jenis kelamin yang sama; peserta dihitung saat dibaca dari `AnggotaRef` berstatus AKTIF (snapshot ke `PesertaSesi` saat sesi dibuka, fase 3).
+- Item rundown dihapus permanen (bukan data inti); acara, sesi, dan foto memakai `deletedAt`.
+- Foto dikecilkan di browser lalu dikonversi ulang di server dengan sharp; file di `UPLOAD_DIR/acara/<id>/`.
 
 ## Tertunda / masalah
-- Skema acara & wabot belum punya migrasi (dibuat di fase 2 dan 7). Kolom waktunya perlu diganti `@db.Timestamptz(3)` seperti core.
+- Skema wabot belum punya migrasi (fase 7). Model acara untuk fase 3–6 (operator, absensi, wajah, rekap) sudah ikut migrasi awal acara dan bisa berubah.
 - Belum ada UI untuk wali (API sudah ada). Belum ada rate limit login.
-- Riwayat acara per anggota di halaman detail menunggu tahap B (acara-svc); riwayat kehadiran menunggu fase 3.
+- Riwayat kehadiran per anggota menunggu fase 3. Statistik acara di dashboard ditambahkan setelah PR dashboard digabung.
 - shadcn/ui di-init manual (components.json, `cn()`, Button); komponen lain ditambah dengan `pnpm dlx shadcn@latest add <nama>` dari apps/web.
 - Celah skema untuk fase 2–6: `Tamu` belum berelasi ke `Sesi`; `Absensi.faceDataId` belum punya foreign key ke `FaceData`.

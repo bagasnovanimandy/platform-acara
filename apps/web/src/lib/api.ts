@@ -2,6 +2,8 @@ import { useAuth } from './auth';
 
 /** Lewat rewrite Next (/api/core → core-svc) supaya cookie refresh satu origin. */
 export const CORE = '/api/core';
+/** Lewat rewrite Next (/api/acara → acara-svc). Token tetap dari core. */
+export const ACARA = '/api/acara';
 
 export class ApiError extends Error {
   constructor(
@@ -65,7 +67,7 @@ type Body = Record<string, unknown> | FormData | undefined;
 
 async function raw(
   path: string,
-  init: { method?: string; body?: Body } = {},
+  init: { method?: string; body?: Body; base?: string } = {},
   retry = true,
 ): Promise<Response> {
   const token = useAuth.getState().accessToken;
@@ -77,7 +79,7 @@ async function raw(
     headers['content-type'] = 'application/json';
     body = JSON.stringify(init.body);
   }
-  const res = await fetch(`${CORE}${path}`, {
+  const res = await fetch(`${init.base ?? CORE}${path}`, {
     method: init.method ?? 'GET',
     headers,
     body,
@@ -90,15 +92,20 @@ async function raw(
 
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: Body } = {},
+  init: { method?: string; body?: Body; base?: string } = {},
 ): Promise<T> {
   const res = await raw(path, init);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
-export async function apiBlob(path: string): Promise<Blob> {
-  return (await raw(path)).blob();
+export async function apiBlob(path: string, base = CORE): Promise<Blob> {
+  return (await raw(path, { base })).blob();
+}
+
+/** Seperti `api`, tetapi ke acara-svc. */
+export function acaraApi<T>(path: string, init: { method?: string; body?: Body } = {}) {
+  return api<T>(path, { ...init, base: ACARA });
 }
 
 export async function login(email: string, password: string): Promise<void> {
