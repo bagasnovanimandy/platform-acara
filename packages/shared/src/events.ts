@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KATEGORI_GENERUS } from './kategori.js';
 
 /**
  * Satu-satunya tempat definisi nama event & payload BullMQ (HANDOVER §2, tabel Event).
@@ -35,9 +36,14 @@ export const anggotaUpsertedSchema = z.object({
   nama: z.string().min(1),
   jk: z.enum(['L', 'P']),
   tglLahir: z.iso.date().nullable(),
+  /** Diisi manual dari assessment; null = belum ditentukan. */
+  kategori: z.enum(KATEGORI_GENERUS).nullable(),
   kelompokId: id,
   desaId: id,
   daerahId: id,
+  namaKelompok: z.string().min(1),
+  namaDesa: z.string().min(1),
+  namaDaerah: z.string().min(1),
   status: z.enum(['AKTIF', 'PINDAH', 'NONAKTIF']),
   noWa: noWa.nullable(),
   waliNoWa: z.array(noWa),
