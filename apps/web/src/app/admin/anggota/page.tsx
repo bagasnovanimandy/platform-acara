@@ -52,15 +52,29 @@ function AnggotaPage() {
   const tree = useWilayahTree();
   const kategoriList = useKategori();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [wilayah, setWilayah] = useState<WilayahValue>(EMPTY_WILAYAH);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
-  const [kategori, setKategori] = useState(useSearchParams().get('kategoriId') ?? '');
+  const [kategori, setKategori] = useState(searchParams.get('kategoriId') ?? '');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Anggota | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [moving, setMoving] = useState<Anggota | null>(null);
   const search = useDebounced(q, 300);
+
+  // Filter wilayah dari tautan dashboard (?desaId= / ?kelompokId=), dilengkapi induknya dari pohon.
+  const urlDesa = searchParams.get('desaId');
+  const urlKelompok = searchParams.get('kelompokId');
+  useEffect(() => {
+    if (!tree.data || (!urlDesa && !urlKelompok)) return;
+    for (const d of tree.data)
+      for (const s of d.desa) {
+        if (s.id === urlDesa) setWilayah({ daerahId: d.id, desaId: s.id, kelompokId: '' });
+        const k = s.kelompok.find((k) => k.id === urlKelompok);
+        if (k) setWilayah({ daerahId: d.id, desaId: s.id, kelompokId: k.id });
+      }
+  }, [tree.data, urlDesa, urlKelompok]);
 
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (search) params.set('q', search);

@@ -498,5 +498,50 @@ check(
   'auditor tidak melihat riwayat kategori',
   (await api('GET', '/audit?entitas=Kategori', { token: au })).json.total === 0,
 );
+
+// Dashboard
+const dashAd = (await api('GET', '/dashboard/ringkasan', { token: ad })).json;
+const totalAd = (await api('GET', '/anggota?pageSize=1', { token: ad })).json.total;
+check(
+  'dashboard admin desa hanya berisi desanya',
+  dashAd.total === totalAd &&
+    dashAd.wilayah.length === 1 &&
+    dashAd.wilayah[0].id === selatan.id &&
+    dashAd.kategori.length > 0 &&
+    dashAd.pertumbuhan.length === 12,
+  JSON.stringify({ total: dashAd.total, totalAd, wilayah: dashAd.wilayah?.map((w) => w.nama) }),
+);
+const dashSa = (await api('GET', '/dashboard/ringkasan', { token: sa })).json;
+check(
+  'dashboard super admin mencakup semua desa',
+  dashSa.total > dashAd.total && dashSa.wilayah.length >= 2,
+);
+const dashAu = await api('GET', '/dashboard/audit', { token: au });
+check(
+  'auditor melihat aktivitas perubahan di wilayahnya',
+  dashAu.status === 200 &&
+    dashAu.json.perHari.length === 30 &&
+    dashAu.json.total > 0 &&
+    dashAu.json.terbaru.every((r) => r.kelompokId === kelMelati.id),
+  JSON.stringify(dashAu.json).slice(0, 200),
+);
+const pengurusEmail = `pengurus.${Date.now()}@x.id`;
+await api('POST', '/users', {
+  token: sa,
+  body: {
+    nama: 'Pengurus Uji',
+    email: pengurusEmail,
+    password: 'rahasia123',
+    role: 'PENGURUS',
+    scopes: [{ level: 'DESA', refId: selatan.id }],
+  },
+});
+const pg = await login(pengurusEmail, 'rahasia123');
+check(
+  'pengurus melihat ringkasan, bukan aktivitas audit',
+  (await api('GET', '/dashboard/ringkasan', { token: pg })).status === 200 &&
+    (await api('GET', '/dashboard/audit', { token: pg })).status === 403,
+);
+
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exitCode = fail ? 1 : 0;

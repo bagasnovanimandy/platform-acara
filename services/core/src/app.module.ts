@@ -5,6 +5,7 @@ import { AnggotaModule } from './anggota/anggota.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InternalModule } from './internal/internal.module.js';
@@ -28,6 +29,7 @@ import { WilayahModule } from './wilayah/wilayah.module.js';
     WaliModule,
     KategoriModule,
     UsersModule,
+    DashboardModule,
     InternalModule,
   ],
   providers: [
