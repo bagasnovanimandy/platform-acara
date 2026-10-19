@@ -1,10 +1,10 @@
 // acara-svc — acara, sesi, rundown, operator, absensi, wajah, rekap
-// DRAFT: sesuaikan saat implementasi fase 2–6.
+// Fase 2: AnggotaRef, Acara, Sesi, Rundown, Pengisi, PJ, PesertaRule, Foto. Model lain masih draft (fase 3–6).
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = "js"
 }
 
@@ -24,6 +24,14 @@ enum StatusSesi {
   TERJADWAL
   DIBUKA
   DITUTUP
+}
+
+/// Tingkat acara. GABUNGAN = beberapa kelompok/desa pilihan.
+enum TingkatAcara {
+  KELOMPOK
+  DESA
+  DAERAH
+  GABUNGAN
 }
 
 enum PeranPJ {
@@ -60,8 +68,8 @@ enum KategoriIzin {
 
 /// Salinan ringkas anggota dari core-svc (event anggota.upserted)
 model AnggotaRef {
-  id           String   @id // = Anggota.id di core
-  kode         String   @unique
+  id           String    @id // = Anggota.id di core
+  kode         String    @unique
   nama         String
   jenisKelamin String
   tanggalLahir DateTime? @db.Date
@@ -72,71 +80,78 @@ model AnggotaRef {
   namaDesa     String
   namaDaerah   String
   status       String
-  syncedAt     DateTime @default(now())
+  kategori     String[] // kode kategori dari core (boleh banyak)
+  updatedAt    DateTime  @db.Timestamptz(3) // dari core, untuk resync
+  syncedAt     DateTime  @default(now()) @db.Timestamptz(3)
 
   faceData FaceData[]
 
   @@index([kelompokId])
   @@index([desaId])
   @@index([daerahId])
+  @@index([kategori], type: Gin)
 }
 
 model Acara {
-  id               String        @id @default(cuid())
-  nama             String
-  jenis            String        // pengajian umum, kelompok, desa, daerah, dll
-  deskripsi        String?
-  lokasi           String?
-  penyelenggaraLevel String      // DAERAH | DESA | KELOMPOK
-  penyelenggaraId  String
-  tanggalMulai     DateTime
-  tanggalSelesai   DateTime
-  status           StatusAcara   @default(DRAFT)
-  thresholdWajah   Float         @default(0.5)
-  dibuatOleh       String        // userId
-  sesi             Sesi[]
-  pj               AcaraPJ[]
-  pesertaRules     PesertaRule[]
-  foto             FotoKegiatan[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                 String         @id @default(cuid())
+  nama               String
+  jenis              String // pengajian umum, kelompok, desa, daerah, dll
+  deskripsi          String?
+  lokasi             String?
+  tingkat            TingkatAcara
+  /// Wilayah pemilik acara (untuk hak ubah): wilayah terkecil yang mencakup semua wilayah peserta.
+  penyelenggaraLevel String // DAERAH | DESA | KELOMPOK
+  penyelenggaraId    String
+  tanggalMulai       DateTime       @db.Timestamptz(3)
+  tanggalSelesai     DateTime       @db.Timestamptz(3)
+  status             StatusAcara    @default(DRAFT)
+  deletedAt          DateTime?      @db.Timestamptz(3)
+  thresholdWajah     Float          @default(0.5)
+  dibuatOleh         String // userId
+  sesi               Sesi[]
+  pj                 AcaraPJ[]
+  pesertaRules       PesertaRule[]
+  foto               FotoKegiatan[]
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(3)
 
   @@index([penyelenggaraLevel, penyelenggaraId])
   @@index([tanggalMulai])
 }
 
 model Sesi {
-  id                String            @id @default(cuid())
-  acaraId           String
-  acara             Acara             @relation(fields: [acaraId], references: [id])
-  nama              String
-  mulai             DateTime
-  selesai           DateTime
-  toleransiMenit    Int               @default(15)
-  batasIzin         DateTime?         // default = mulai
-  status            StatusSesi        @default(TERJADWAL)
-  ditutupAt         DateTime?
-  rundown           RundownItem[]
-  operator          OperatorSession[]
-  peserta           PesertaSesi[]
-  absensi           Absensi[]
-  rekap             Rekap[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  acaraId        String
+  acara          Acara             @relation(fields: [acaraId], references: [id])
+  nama           String
+  mulai          DateTime          @db.Timestamptz(3)
+  selesai        DateTime          @db.Timestamptz(3)
+  toleransiMenit Int               @default(15)
+  batasIzin      DateTime?         @db.Timestamptz(3) // default = mulai
+  status         StatusSesi        @default(TERJADWAL)
+  ditutupAt      DateTime?         @db.Timestamptz(3)
+  deletedAt      DateTime?         @db.Timestamptz(3)
+  rundown        RundownItem[]
+  operator       OperatorSession[]
+  peserta        PesertaSesi[]
+  absensi        Absensi[]
+  rekap          Rekap[]
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
 
   @@index([acaraId])
 }
 
 model RundownItem {
-  id        String    @id @default(cuid())
-  sesiId    String
-  sesi      Sesi      @relation(fields: [sesiId], references: [id])
-  urutan    Int
-  mulai     DateTime?
-  selesai   DateTime?
-  judul     String
+  id         String    @id @default(cuid())
+  sesiId     String
+  sesi       Sesi      @relation(fields: [sesiId], references: [id])
+  urutan     Int
+  mulai      DateTime? @db.Timestamptz(3)
+  selesai    DateTime? @db.Timestamptz(3)
+  judul      String
   keterangan String?
-  pengisi   Pengisi[]
+  pengisi    Pengisi[]
 
   @@index([sesiId, urutan])
 }
@@ -145,99 +160,104 @@ model Pengisi {
   id            String      @id @default(cuid())
   rundownItemId String
   rundownItem   RundownItem @relation(fields: [rundownItemId], references: [id])
-  anggotaId     String?     // bila anggota terdaftar
-  namaBebas     String?     // bila bukan anggota
-  peran         String?     // mis. "pemateri", "MC", "qori"
+  anggotaId     String? // bila anggota terdaftar
+  namaBebas     String? // bila bukan anggota
+  peran         String? // mis. "pemateri", "MC", "qori"
 }
 
 model AcaraPJ {
-  id        String   @id @default(cuid())
-  acaraId   String
-  acara     Acara    @relation(fields: [acaraId], references: [id])
-  userId    String   // user core (PENGURUS/ADMIN)
-  peran     PeranPJ
+  id         String  @id @default(cuid())
+  acaraId    String
+  acara      Acara   @relation(fields: [acaraId], references: [id])
+  userId     String // user core (PENGURUS/ADMIN)
+  nama       String // salinan nama user saat ditetapkan
+  peran      PeranPJ
   keterangan String?
 
   @@unique([acaraId, userId, peran])
 }
 
-/// Aturan peserta target. Semua field opsional = filter.
+/// Aturan peserta: satu baris per wilayah yang ikut. Peserta = anggota AKTIF di wilayah itu
+/// yang cocok jenis kelamin (null = semua) dan punya salah satu kategori (kosong = semua).
 model PesertaRule {
-  id            String  @id @default(cuid())
-  acaraId       String
-  acara         Acara   @relation(fields: [acaraId], references: [id])
-  level         String  // DAERAH | DESA | KELOMPOK
-  refId         String
-  jenisKelamin  String? // L | P | null = semua
-  kategoriUsia  String[] // ["remaja","usia_nikah"], kosong = semua
+  id           String   @id @default(cuid())
+  acaraId      String
+  acara        Acara    @relation(fields: [acaraId], references: [id])
+  level        String // DAERAH | DESA | KELOMPOK
+  refId        String
+  jenisKelamin String? // L | P | null = semua
+  kategori     String[] // kode kategori, kosong = semua
+
+  @@index([acaraId])
 }
 
 /// Snapshot peserta saat sesi dibuka
 model PesertaSesi {
-  sesiId    String
-  sesi      Sesi   @relation(fields: [sesiId], references: [id])
-  anggotaId String
+  sesiId     String
+  sesi       Sesi   @relation(fields: [sesiId], references: [id])
+  anggotaId  String
   kelompokId String
-  desaId    String
-  daerahId  String
+  desaId     String
+  daerahId   String
 
   @@id([sesiId, anggotaId])
 }
 
 model FotoKegiatan {
-  id         String   @id @default(cuid())
-  acaraId    String
-  acara      Acara    @relation(fields: [acaraId], references: [id])
-  sesiId     String?
-  path       String
-  thumbPath  String
-  caption    String?
+  id           String    @id @default(cuid())
+  acaraId      String
+  acara        Acara     @relation(fields: [acaraId], references: [id])
+  sesiId       String?
+  path         String
+  thumbPath    String
+  caption      String?
   diunggahOleh String
-  createdAt  DateTime @default(now())
+  deletedAt    DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([acaraId])
 }
 
 model OperatorSession {
-  id          String    @id @default(cuid())
-  sesiId      String
-  sesi        Sesi      @relation(fields: [sesiId], references: [id])
-  label       String    // "Pintu 1"
-  nomor       Int
-  pinHash     String
-  qrToken     String    @unique // sekali pakai
-  qrUsedAt    DateTime?
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  lastSeenAt  DateTime?
-  lastScanAt  DateTime?
-  antrean     Int       @default(0) // jumlah data belum sinkron (dari heartbeat)
-  perangkat   String?   // user agent ringkas
-  dibuatOleh  String
-  absensi     Absensi[]
+  id           String     @id @default(cuid())
+  sesiId       String
+  sesi         Sesi       @relation(fields: [sesiId], references: [id])
+  label        String // "Pintu 1"
+  nomor        Int
+  pinHash      String
+  qrToken      String     @unique // sekali pakai
+  qrUsedAt     DateTime?  @db.Timestamptz(3)
+  expiresAt    DateTime   @db.Timestamptz(3)
+  revokedAt    DateTime?  @db.Timestamptz(3)
+  lastSeenAt   DateTime?  @db.Timestamptz(3)
+  lastScanAt   DateTime?  @db.Timestamptz(3)
+  antrean      Int        @default(0) // jumlah data belum sinkron (dari heartbeat)
+  perangkat    String? // user agent ringkas
+  dibuatOleh   String
+  absensi      Absensi[]
   faceEnrolled FaceData[]
-  createdAt   DateTime  @default(now())
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
 
   @@unique([sesiId, nomor])
 }
 
 model Absensi {
-  id                String          @id @default(cuid())
-  clientId          String          @unique // UUID dari perangkat (idempoten)
+  id                String           @id @default(cuid())
+  clientId          String           @unique // UUID dari perangkat (idempoten)
   sesiId            String
-  sesi              Sesi            @relation(fields: [sesiId], references: [id])
-  anggotaId         String?         // null bila tamu
+  sesi              Sesi             @relation(fields: [sesiId], references: [id])
+  anggotaId         String? // null bila tamu
   tamuId            String?
   metode            MetodeAbsensi
   operatorSessionId String?
   operator          OperatorSession? @relation(fields: [operatorSessionId], references: [id])
-  dicatatAdminId    String?         // absensi susulan oleh admin
+  dicatatAdminId    String? // absensi susulan oleh admin
   faceDataId        String?
   faceDistance      Float?
-  capturedAt        DateTime        // waktu di perangkat
-  syncedAt          DateTime        @default(now())
-  terlambat         Boolean         @default(false)
-  perluTinjau       Boolean         @default(false)
+  capturedAt        DateTime         @db.Timestamptz(3) // waktu di perangkat
+  syncedAt          DateTime         @default(now()) @db.Timestamptz(3)
+  terlambat         Boolean          @default(false)
+  perluTinjau       Boolean          @default(false)
   catatan           String?
 
   @@unique([sesiId, anggotaId])
@@ -250,19 +270,19 @@ model AbsensiDuplikat {
   sesiId            String
   anggotaId         String
   operatorSessionId String?
-  capturedAt        DateTime
-  createdAt         DateTime @default(now())
+  capturedAt        DateTime @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([sesiId])
 }
 
 model Tamu {
-  id        String   @id @default(cuid())
-  sesiId    String
-  nama      String
-  keterangan String?
+  id                    String   @id @default(cuid())
+  sesiId                String
+  nama                  String
+  keterangan            String?
   dicocokkanKeAnggotaId String?
-  createdAt DateTime @default(now())
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model FaceData {
@@ -270,17 +290,17 @@ model FaceData {
   clientId                    String           @unique
   anggotaId                   String
   anggota                     AnggotaRef       @relation(fields: [anggotaId], references: [id])
-  embeddings                  Json             // number[5][128]
-  thumbnails                  String[]         // 5 path
+  embeddings                  Json // number[5][128]
+  thumbnails                  String[] // 5 path
   status                      StatusWajah      @default(PENDING)
-  sumber                      String           // ADMIN | OPERATOR
+  sumber                      String // ADMIN | OPERATOR
   enrolledByOperatorSessionId String?
   enrolledByOperator          OperatorSession? @relation(fields: [enrolledByOperatorSessionId], references: [id])
   enrolledByUserId            String?
   verifiedBy                  String?
-  verifiedAt                  DateTime?
+  verifiedAt                  DateTime?        @db.Timestamptz(3)
   alasanTolak                 String?
-  createdAt                   DateTime         @default(now())
+  createdAt                   DateTime         @default(now()) @db.Timestamptz(3)
 
   @@index([anggotaId])
   @@index([status])
@@ -291,10 +311,10 @@ model IzinRef {
   id        String       @id // = Izin.id di wabot
   anggotaId String
   acaraId   String
-  sesiId    String?      // null = berlaku semua sesi acara
+  sesiId    String? // null = berlaku semua sesi acara
   kategori  KategoriIzin
-  status    String       // SUBMITTED | APPROVED | REJECTED | CANCELLED
-  updatedAt DateTime     @updatedAt
+  status    String // SUBMITTED | APPROVED | REJECTED | CANCELLED
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
 
   @@index([anggotaId, acaraId])
 }
@@ -307,7 +327,7 @@ model Rekap {
   terlambat  Boolean     @default(false)
   absensiId  String?
   izinId     String?
-  dihitungAt DateTime    @default(now())
+  dihitungAt DateTime    @default(now()) @db.Timestamptz(3)
 
   @@id([sesiId, anggotaId])
   @@index([sesiId, status])

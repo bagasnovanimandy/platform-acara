@@ -25,7 +25,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  e2e-core:
+  e2e:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -52,9 +52,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run build --filter=@platform-acara/core...
+      - run: pnpm turbo run build --filter=@platform-acara/core... --filter=@platform-acara/acara...
       - run: pnpm --filter @platform-acara/core db:deploy
       - run: pnpm --filter @platform-acara/core db:seed
+      - name: Create acara_db
+        run: PGPASSWORD=app psql -h localhost -U app -d core_db -c 'CREATE DATABASE acara_db'
+      - run: pnpm --filter @platform-acara/acara db:deploy
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/acara_db
       - name: Start core-svc
         working-directory: services/core
         run: |
@@ -62,5 +67,16 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:3001/health && exit 0; sleep 1; done
           cat core.log; exit 1
       - run: pnpm --filter @platform-acara/core test:e2e
+      - name: Start acara-svc
+        working-directory: services/acara
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/acara_db
+        run: |
+          node dist/main.js > acara.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3002/health && exit 0; sleep 1; done
+          cat acara.log; exit 1
+      - run: pnpm --filter @platform-acara/acara test:e2e
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/acara_db
       - if: failure()
-        run: cat services/core/core.log
+        run: cat services/core/core.log services/acara/acara.log

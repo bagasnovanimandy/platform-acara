@@ -46,6 +46,8 @@ export const anggotaUpsertedSchema = z.object({
   status: z.enum(['AKTIF', 'PINDAH', 'NONAKTIF']),
   noWa: noWa.nullable(),
   waliNoWa: z.array(noWa),
+  /** Waktu perubahan terakhir di core (untuk resync consumer). */
+  updatedAt: isoDate,
 });
 
 export const anggotaMutasiSchema = z.object({
