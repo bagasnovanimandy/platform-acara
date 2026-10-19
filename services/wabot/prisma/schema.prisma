@@ -1,0 +1,78 @@
+// wabot-svc — bot WA (Baileys), pengajuan izin, log pesan
+// DRAFT: sesuaikan saat implementasi fase 7.
+// State percakapan disimpan di Redis (bot:state:{noWa}, TTL 10 menit), bukan di DB.
+// Auth state Baileys disimpan di volume file (/data/wa-auth).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum KategoriIzin {
+  IZIN
+  SAKIT
+}
+
+enum StatusIzin {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PengajuTipe {
+  ANGGOTA
+  WALI
+}
+
+enum ArahPesan {
+  MASUK
+  KELUAR
+}
+
+/// Salinan ringkas kontak dari core (event anggota.upserted) untuk mencocokkan nomor
+model KontakRef {
+  noWa      String   @id // 62xxxx
+  tipe      PengajuTipe
+  anggotaIds String[] // ANGGOTA: [dirinya]; WALI: anak-anaknya
+  nama      String
+  syncedAt  DateTime @default(now())
+}
+
+model Izin {
+  id              String       @id @default(cuid())
+  nomor           Int          @unique @default(autoincrement()) // tampil sebagai IZ-0123
+  anggotaId       String
+  namaAnggota     String
+  pengajuNoWa     String
+  pengajuTipe     PengajuTipe
+  acaraId         String
+  sesiId          String?
+  kategori        KategoriIzin
+  alasan          String       @db.VarChar(300)
+  status          StatusIzin   @default(SUBMITTED)
+  handlerUserIds  String[]     // PJ_IZIN yang menerima
+  decidedBy       String?
+  decidedVia      String?      // WA | WEB
+  decidedAt       DateTime?
+  catatanPengurus String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([anggotaId, acaraId])
+  @@index([status])
+}
+
+model PesanLog {
+  id        String    @id @default(cuid())
+  noWa      String
+  arah      ArahPesan
+  isi       String
+  izinId    String?
+  createdAt DateTime  @default(now())
+
+  @@index([noWa, createdAt])
+}

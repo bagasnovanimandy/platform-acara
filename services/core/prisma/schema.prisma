@@ -1,0 +1,176 @@
+// core-svc — auth, wilayah, anggota, wali
+// DRAFT: sesuaikan saat implementasi fase 1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  PENGURUS
+}
+
+enum JenisKelamin {
+  L
+  P
+}
+
+enum StatusAnggota {
+  AKTIF
+  PINDAH
+  NONAKTIF
+}
+
+enum HubunganWali {
+  AYAH
+  IBU
+  WALI
+}
+
+enum ScopeLevel {
+  DAERAH
+  DESA
+  KELOMPOK
+}
+
+model Daerah {
+  id        String   @id @default(cuid())
+  kode      String   @unique
+  nama      String
+  desa      Desa[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Desa {
+  id        String     @id @default(cuid())
+  kode      String     @unique
+  nama      String
+  daerahId  String
+  daerah    Daerah     @relation(fields: [daerahId], references: [id])
+  kelompok  Kelompok[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([daerahId])
+}
+
+model Kelompok {
+  id        String    @id @default(cuid())
+  kode      String    @unique
+  nama      String
+  desaId    String
+  desa      Desa      @relation(fields: [desaId], references: [id])
+  alamat    String?   // lokasi tempat ngaji (opsional)
+  lat       Float?
+  lng       Float?
+  anggota   Anggota[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([desaId])
+}
+
+/// Alamat sambung = kelompok -> desa -> daerah (diturunkan dari kelompokId)
+model Anggota {
+  id           String          @id @default(cuid())
+  kode         String          @unique // mis. JS-0001
+  nama         String
+  jenisKelamin JenisKelamin
+  tanggalLahir DateTime?       @db.Date
+  noWa         String?         @unique // format 62xxxx
+  kelompokId   String
+  kelompok     Kelompok        @relation(fields: [kelompokId], references: [id])
+  status       StatusAnggota   @default(AKTIF)
+  fotoUrl      String?
+  wali         AnggotaWali[]
+  mutasi       MutasiSambung[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([kelompokId])
+  @@index([nama])
+}
+
+model Wali {
+  id        String        @id @default(cuid())
+  nama      String
+  noWa      String        @unique // format 62xxxx
+  anak      AnggotaWali[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model AnggotaWali {
+  anggotaId String
+  waliId    String
+  hubungan  HubunganWali
+  anggota   Anggota      @relation(fields: [anggotaId], references: [id])
+  wali      Wali         @relation(fields: [waliId], references: [id])
+
+  @@id([anggotaId, waliId])
+  @@index([waliId])
+}
+
+model MutasiSambung {
+  id             String   @id @default(cuid())
+  anggotaId      String
+  anggota        Anggota  @relation(fields: [anggotaId], references: [id])
+  dariKelompokId String
+  keKelompokId   String
+  tanggal        DateTime @db.Date
+  catatan        String?
+  dicatatOleh    String   // userId
+  createdAt      DateTime @default(now())
+
+  @@index([anggotaId])
+}
+
+model User {
+  id           String      @id @default(cuid())
+  nama         String
+  email        String      @unique
+  passwordHash String
+  noWa         String?     @unique
+  role         Role
+  anggotaId    String?     @unique // bila user juga anggota
+  aktif        Boolean     @default(true)
+  scopes       UserScope[]
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+/// Wilayah yang boleh dikelola user (ADMIN/PENGURUS). SUPER_ADMIN tanpa scope = semua.
+model UserScope {
+  id      String     @id @default(cuid())
+  userId  String
+  user    User       @relation(fields: [userId], references: [id])
+  level   ScopeLevel
+  refId   String     // id daerah / desa / kelompok
+
+  @@unique([userId, level, refId])
+}
+
+model Setting {
+  key       String   @id // mis. "usia.caberawit.max"
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  aksi      String
+  entitas   String
+  entitasId String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entitas, entitasId])
+}
