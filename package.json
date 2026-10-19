@@ -14,7 +14,9 @@
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:seed": "turbo run db:seed",
+    "db:deploy": "turbo run db:deploy"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

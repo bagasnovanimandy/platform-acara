@@ -27,6 +27,12 @@
       "dependsOn": ["^build", "db:generate"],
       "cache": false,
       "persistent": true
+    },
+    "db:seed": {
+      "cache": false
+    },
+    "db:deploy": {
+      "cache": false
     }
   }
 }

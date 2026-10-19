@@ -9,8 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",

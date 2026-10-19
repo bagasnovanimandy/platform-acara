@@ -25,15 +25,35 @@ docs/                HANDOVER, PROMPTS, PROGRESS
 pnpm install
 docker compose -f infra/docker-compose.dev.yml up -d
 for s in core acara wabot; do cp services/$s/.env.example services/$s/.env; done
+cp apps/web/.env.example apps/web/.env.local
 pnpm db:generate
+pnpm db:deploy     # terapkan migrasi (saat ini: core_db)
+pnpm db:seed       # SUPER_ADMIN + wilayah & 40 anggota contoh
 pnpm dev
 ```
+Buka http://localhost:3000/login dan masuk dengan `admin@platform-acara.local` / `admin12345`
+(ubah lewat `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` di `services/core/.env`).
+
 Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api/health`.
 `/health` service mengembalikan 503 bila database tidak terhubung.
 
 Perintah lain: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format`.
+Uji end-to-end core (service harus jalan + data seed): `pnpm --filter @platform-acara/core test:e2e`.
 
-Skema Prisma masih draft dan belum punya migrasi. Untuk dev, `pnpm --filter @platform-acara/<service> exec prisma db push` menerapkan skema ke database; migrasi pertama dibuat di fase 1.
+Mengubah skema core: edit `services/core/prisma/schema.prisma`, lalu
+`pnpm --filter @platform-acara/core db:migrate --name <nama>`.
+Skema acara & wabot masih draft tanpa migrasi; untuk mencoba, `pnpm --filter @platform-acara/<service> exec prisma db push`.
+
+## API core (ringkas)
+Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi oleh Traefik).
+- `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `GET /auth/.well-known/jwks.json`
+- `GET /wilayah/tree`, `GET|POST|PATCH /wilayah/daerah|desa|kelompok`
+- `GET|POST|PATCH /anggota`, `POST /anggota/:id/mutasi`, `POST /anggota/import?dryRun=true`, `GET /anggota/import/template`
+- `GET|POST|PATCH /wali`, `POST /wali/:id/anak`
+- `GET|POST|PATCH /users` (SUPER_ADMIN)
+- `GET /internal/anggota?ids=…`, `GET /internal/setting?prefix=…` (header `x-internal-key`)
+
+Error selalu `{ code, message, details? }`.
 
 ## Prasyarat
 Node.js 22, pnpm 10, Docker.

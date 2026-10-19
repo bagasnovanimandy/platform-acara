@@ -24,3 +24,43 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e-core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: core_db
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U app" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://app:app@localhost:5432/core_db
+      REDIS_URL: redis://localhost:6379
+      INTERNAL_KEY: ci-internal-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@platform-acara/core...
+      - run: pnpm --filter @platform-acara/core db:deploy
+      - run: pnpm --filter @platform-acara/core db:seed
+      - name: Start core-svc
+        working-directory: services/core
+        run: |
+          node dist/main.js > core.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3001/health && exit 0; sleep 1; done
+          cat core.log; exit 1
+      - run: pnpm --filter @platform-acara/core test:e2e
+      - if: failure()
+        run: cat services/core/core.log

@@ -2,9 +2,9 @@
 // DRAFT: sesuaikan saat implementasi fase 1.
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = "js"
 }
 
@@ -46,8 +46,8 @@ model Daerah {
   kode      String   @unique
   nama      String
   desa      Desa[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model Desa {
@@ -57,8 +57,8 @@ model Desa {
   daerahId  String
   daerah    Daerah     @relation(fields: [daerahId], references: [id])
   kelompok  Kelompok[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @db.Timestamptz(3)
 
   @@index([daerahId])
 }
@@ -69,12 +69,12 @@ model Kelompok {
   nama      String
   desaId    String
   desa      Desa      @relation(fields: [desaId], references: [id])
-  alamat    String?   // lokasi tempat ngaji (opsional)
+  alamat    String? // lokasi tempat ngaji (opsional)
   lat       Float?
   lng       Float?
   anggota   Anggota[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 
   @@index([desaId])
 }
@@ -93,8 +93,8 @@ model Anggota {
   fotoUrl      String?
   wali         AnggotaWali[]
   mutasi       MutasiSambung[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
 
   @@index([kelompokId])
   @@index([nama])
@@ -105,8 +105,8 @@ model Wali {
   nama      String
   noWa      String        @unique // format 62xxxx
   anak      AnggotaWali[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
 }
 
 model AnggotaWali {
@@ -128,8 +128,8 @@ model MutasiSambung {
   keKelompokId   String
   tanggal        DateTime @db.Date
   catatan        String?
-  dicatatOleh    String   // userId
-  createdAt      DateTime @default(now())
+  dicatatOleh    String // userId
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([anggotaId])
 }
@@ -144,18 +144,18 @@ model User {
   anggotaId    String?     @unique // bila user juga anggota
   aktif        Boolean     @default(true)
   scopes       UserScope[]
-  lastLoginAt  DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  lastLoginAt  DateTime?   @db.Timestamptz(3)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(3)
 }
 
 /// Wilayah yang boleh dikelola user (ADMIN/PENGURUS). SUPER_ADMIN tanpa scope = semua.
 model UserScope {
-  id      String     @id @default(cuid())
-  userId  String
-  user    User       @relation(fields: [userId], references: [id])
-  level   ScopeLevel
-  refId   String     // id daerah / desa / kelompok
+  id     String     @id @default(cuid())
+  userId String
+  user   User       @relation(fields: [userId], references: [id])
+  level  ScopeLevel
+  refId  String // id daerah / desa / kelompok
 
   @@unique([userId, level, refId])
 }
@@ -163,7 +163,7 @@ model UserScope {
 model Setting {
   key       String   @id // mis. "usia.caberawit.max"
   value     Json
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model AuditLog {
@@ -173,7 +173,13 @@ model AuditLog {
   entitas   String
   entitasId String?
   data      Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([entitas, entitasId])
+}
+
+/// Nomor urut terakhir kode anggota per desa (kode = <kodeDesa>-<urut 4 digit>)
+model KodeCounter {
+  desaId String @id
+  last   Int    @default(0)
 }
