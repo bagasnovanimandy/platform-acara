@@ -5,15 +5,17 @@ import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { logout, refreshSession } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import { type AuthUser } from '@/lib/api';
+import { canAudit, canEdit, ROLE_LABEL, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
-const NAV = [
+const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
   { href: '/admin/anggota', label: 'Anggota' },
+  { href: '/admin/kategori', label: 'Kategori' },
   { href: '/admin/wilayah', label: 'Wilayah' },
+  { href: '/admin/pengguna', label: 'Pengguna', show: canEdit },
+  { href: '/admin/riwayat', label: 'Riwayat', show: canAudit },
 ];
-
-const ROLE_LABEL = { SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', PENGURUS: 'Pengurus' } as const;
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
@@ -31,18 +33,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b">
+      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/admin" className="font-semibold">
             Platform Acara
           </Link>
-          <nav className="flex gap-1">
-            {NAV.map((n) => (
+          <nav className="-mx-1 flex gap-1 overflow-x-auto px-1">
+            {NAV.filter((n) => !n.show || n.show(user)).map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm hover:bg-accent',
+                  'rounded-md px-3 py-1.5 text-sm whitespace-nowrap hover:bg-accent',
                   pathname.startsWith(n.href) && 'bg-accent font-medium',
                 )}
               >

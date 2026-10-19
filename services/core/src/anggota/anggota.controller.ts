@@ -28,7 +28,7 @@ import { importTemplateXlsx, readImportXlsx } from './xlsx.js';
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 @Controller('anggota')
-@Roles('ADMIN', 'PENGURUS')
+@Roles('ADMIN', 'PENGURUS', 'AUDITOR')
 export class AnggotaController {
   constructor(private readonly anggota: AnggotaService) {}
 
@@ -43,7 +43,7 @@ export class AnggotaController {
     res
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .attachment('template-import-anggota.xlsx')
-      .send(await importTemplateXlsx());
+      .send(await importTemplateXlsx(await this.anggota.namaKategoriAktif()));
   }
 
   /** `?dryRun=true` hanya memvalidasi; tanpa itu baris valid langsung disimpan. */
@@ -63,6 +63,11 @@ export class AnggotaController {
   @Get(':id')
   get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.anggota.get(user, id);
+  }
+
+  @Get(':id/riwayat')
+  riwayat(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.anggota.riwayat(user, id);
   }
 
   @Post()

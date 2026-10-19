@@ -1,4 +1,4 @@
-import { type KategoriGenerus, normalizeWa, parseKategori } from '@platform-acara/shared';
+import { kunciKategori, normalizeWa } from '@platform-acara/shared';
 
 /** Kolom file import (header baris pertama, tidak peka huruf besar/kecil). */
 export const IMPORT_COLUMNS = [
@@ -24,7 +24,15 @@ export interface WilayahRef {
   desaId: string;
   desa: string;
   kodeDesa: string;
+  daerahId: string;
   daerah: string;
+}
+
+export interface KategoriRef {
+  id: string;
+  kode: string;
+  nama: string;
+  warna: string;
 }
 
 export interface ValidRow {
@@ -32,7 +40,7 @@ export interface ValidRow {
   nama: string;
   jenisKelamin: 'L' | 'P';
   tanggalLahir: string | null;
-  kategori: KategoriGenerus | null;
+  kategoriIds: string[];
   noWa: string | null;
   noWaOrtu: string | null;
   namaOrtu: string | null;
@@ -51,6 +59,8 @@ export interface ImportContext {
   canManageKelompok: (kelompokId: string) => boolean;
   /** Nomor WA anggota yang sudah terdaftar */
   existingNoWa: ReadonlySet<string>;
+  /** Kategori aktif, key = id */
+  kategori: ReadonlyMap<string, KategoriRef>;
 }
 
 export const normalizeName = (v: string): string => v.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -113,6 +123,11 @@ export function validateImportRows(
   const valid: ValidRow[] = [];
   const errors: RowError[] = [];
   const seenNoWa = new Map<string, number>();
+  const kategoriByKey = new Map<string, KategoriRef>();
+  for (const k of ctx.kategori.values()) {
+    kategoriByKey.set(kunciKategori(k.nama), k);
+    kategoriByKey.set(kunciKategori(k.kode), k);
+  }
 
   rows.forEach((row, i) => {
     const baris = firstRow + i;
@@ -127,11 +142,13 @@ export function validateImportRows(
     const tgl = parseTanggal(row['Tgl Lahir']);
     if (tgl === 'invalid') pesan.push('Tgl Lahir tidak valid (pakai dd/mm/yyyy)');
 
-    // Kategori opsional: boleh dikosongkan lalu diisi setelah assessment.
-    let kategori: KategoriGenerus | null = null;
-    if (text(row.Kategori)) {
-      kategori = parseKategori(text(row.Kategori));
-      if (!kategori) pesan.push('Kategori harus Caberawit, Pra-remaja, Remaja, atau Usia nikah');
+    // Kategori opsional (boleh lebih dari satu, pisahkan dengan koma); bisa diisi setelah assessment.
+    const kategoriIds: string[] = [];
+    for (const part of text(row.Kategori).split(/[,;/]/)) {
+      if (!part.trim()) continue;
+      const k = kategoriByKey.get(kunciKategori(part));
+      if (!k) pesan.push(`Kategori "${part.trim()}" tidak dikenal`);
+      else if (!kategoriIds.includes(k.id)) kategoriIds.push(k.id);
     }
 
     let noWa: string | null = null;
@@ -171,7 +188,7 @@ export function validateImportRows(
       nama,
       jenisKelamin: jk,
       tanggalLahir: tgl,
-      kategori,
+      kategoriIds,
       noWa,
       noWaOrtu,
       namaOrtu,

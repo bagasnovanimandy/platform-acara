@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
-import { KategoriBadge } from '@/components/kategori-badge';
+import { KategoriList } from '@/components/kategori-badge';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,7 +71,7 @@ export default function ImportPage() {
           <CardDescription>
             Baris pertama berisi judul kolom: {COLUMNS}. Nama wilayah harus sama dengan data wilayah
             (huruf besar/kecil tidak masalah). Tanggal lahir pakai format dd/mm/yyyy. Kategori boleh
-            dikosongkan bila belum di-assessment.
+            lebih dari satu (pisahkan dengan koma) atau dikosongkan bila belum di-assessment.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -197,7 +197,7 @@ export default function ImportPage() {
                           <TableCell>{p.baris}</TableCell>
                           <TableCell className="font-medium">{p.nama}</TableCell>
                           <TableCell>
-                            <KategoriBadge kategori={p.kategori} />
+                            <KategoriList kategori={p.kategori} />
                           </TableCell>
                           <TableCell>{p.jenisKelamin}</TableCell>
                           <TableCell>{formatTanggal(p.tanggalLahir)}</TableCell>

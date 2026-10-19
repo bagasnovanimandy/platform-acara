@@ -1,10 +1,10 @@
 'use client';
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { KATEGORI_GENERUS, KATEGORI_GENERUS_LABEL } from '@platform-acara/shared';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { KategoriBadge } from '@/components/kategori-badge';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { KategoriList } from '@/components/kategori-badge';
 import { EMPTY_WILAYAH, WilayahSelect, type WilayahValue } from '@/components/wilayah-select';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import { api, errorMessage } from '@/lib/api';
 import { canEdit, useAuth } from '@/lib/auth';
-import { formatTanggal, useWilayahTree } from '@/lib/queries';
+import { formatTanggal, useKategori, useWilayahTree } from '@/lib/queries';
 import type { Anggota, Paginated } from '@/lib/types';
 import { AnggotaFormDialog, MutasiDialog } from './anggota-form';
 
@@ -38,14 +38,24 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
-export default function AnggotaPage() {
+export default function AnggotaPageRoute() {
+  return (
+    <Suspense>
+      <AnggotaPage />
+    </Suspense>
+  );
+}
+
+function AnggotaPage() {
   const user = useAuth((s) => s.user);
   const editable = canEdit(user);
   const tree = useWilayahTree();
+  const kategoriList = useKategori();
+  const router = useRouter();
   const [wilayah, setWilayah] = useState<WilayahValue>(EMPTY_WILAYAH);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
-  const [kategori, setKategori] = useState('');
+  const [kategori, setKategori] = useState(useSearchParams().get('kategoriId') ?? '');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Anggota | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -55,7 +65,7 @@ export default function AnggotaPage() {
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (search) params.set('q', search);
   if (status) params.set('status', status);
-  if (kategori) params.set('kategori', kategori);
+  if (kategori) params.set('kategoriId', kategori);
   if (wilayah.kelompokId) params.set('kelompokId', wilayah.kelompokId);
   else if (wilayah.desaId) params.set('desaId', wilayah.desaId);
   else if (wilayah.daerahId) params.set('daerahId', wilayah.daerahId);
@@ -121,9 +131,9 @@ export default function AnggotaPage() {
             }}
           >
             <option value="">Semua</option>
-            {KATEGORI_GENERUS.map((k) => (
-              <option key={k} value={k}>
-                {KATEGORI_GENERUS_LABEL[k]}
+            {kategoriList.data?.items.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.nama}
               </option>
             ))}
             <option value="BELUM">Belum diisi</option>
@@ -166,11 +176,23 @@ export default function AnggotaPage() {
           </TableHeader>
           <TableBody>
             {list.data?.items.map((a) => (
-              <TableRow key={a.id}>
+              <TableRow
+                key={a.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/admin/anggota/${a.id}`)}
+              >
                 <TableCell className="font-mono text-xs">{a.kode}</TableCell>
-                <TableCell className="font-medium">{a.nama}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/admin/anggota/${a.id}`}
+                    className="hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {a.nama}
+                  </Link>
+                </TableCell>
                 <TableCell>
-                  <KategoriBadge kategori={a.kategori} />
+                  <KategoriList kategori={a.kategori} />
                 </TableCell>
                 <TableCell>{a.jenisKelamin}</TableCell>
                 <TableCell>{formatTanggal(a.tanggalLahir)}</TableCell>
@@ -182,7 +204,7 @@ export default function AnggotaPage() {
                   <Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge>
                 </TableCell>
                 {editable && (
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"

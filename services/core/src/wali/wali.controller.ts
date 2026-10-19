@@ -5,7 +5,7 @@ import { CreateWaliDto, LinkAnakDto, ListWaliQuery, UpdateWaliDto } from './wali
 import { WaliService } from './wali.service.js';
 
 @Controller('wali')
-@Roles('ADMIN', 'PENGURUS')
+@Roles('ADMIN', 'PENGURUS', 'AUDITOR')
 export class WaliController {
   constructor(private readonly wali: WaliService) {}
 

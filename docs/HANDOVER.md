@@ -76,7 +76,8 @@ Platform untuk mengelola acara pengajian di lingkup Daerah → Desa → Kelompok
 
 ### Auth
 - `core-svc` menerbitkan **JWT RS256**. Service lain memverifikasi via JWKS (`/auth/.well-known/jwks.json`).
-- Role: `SUPER_ADMIN`, `ADMIN`, `PENGURUS`, `OPERATOR`.
+- Role: `SUPER_ADMIN`, `ADMIN`, `PENGURUS`, `AUDITOR` (hanya melihat data & riwayat perubahan di wilayahnya), `OPERATOR`. *(AUDITOR ditambah 2026-10-19.)*
+- Admin bertingkat (seperti SiKU): ADMIN boleh membuat/mengubah pengguna lain asalkan semua wilayahnya di dalam wilayah ADMIN itu; tidak bisa membuat SUPER_ADMIN.
 - `ADMIN`/`PENGURUS` punya **scope wilayah** (daerah/desa/kelompok) → hanya melihat data di wilayahnya.
 - `OPERATOR` **tidak** dibuat di core. Token operator diterbitkan oleh `acara-svc` (JWT berumur sampai sesi berakhir, claims: `operatorSessionId`, `sesiId`, `acaraId`, `label`). Verifikasi tetap via kunci milik acara-svc.
 
@@ -121,7 +122,7 @@ Draft lengkap ada di `services/*/prisma/schema.prisma`.
 - **Daerah** → **Desa** → **Kelompok** (bertingkat, bukan teks bebas).
 - **Anggota**: `kode` (mis. `JS-0001`), `nama`, `jenisKelamin`, `tanggalLahir`, `noWa?` (format `62…`), `kelompokId`, `status` (AKTIF/PINDAH/NONAKTIF), `fotoUrl?`.
   - **Alamat sambung = Kelompok–Desa–Daerah**, diturunkan dari `kelompokId`. Tidak ada field alamat sambung terpisah, tidak ada alamat rumah.
-  - Kategori generus (caberawit/praremaja/remaja/usia nikah) **diisi manual** per anggota (`kategori`, boleh kosong = belum ditentukan) berdasarkan assessment tersendiri. **Tidak** dihitung dari umur/tanggal lahir. *(Diubah 2026-10-19 atas permintaan pemilik.)*
+  - **Kategori** (Caberawit, Pra-remaja, Remaja, Usia nikah, Usia mandiri, Dewasa, Lansia, Ibu-ibu, Bapak-bapak, …) adalah daftar yang dikelola admin (tabel `Kategori`). Satu anggota boleh punya **banyak** kategori (`AnggotaKategori`), diisi manual dari assessment tersendiri, **tidak** dihitung dari umur. Kategori lintas wilayah: acara memilih kategori dan wilayah peserta. *(Diubah 2026-10-19 atas permintaan pemilik.)*
 - **Wali** (`noWa` unik) ↔ **AnggotaWali** (satu wali bisa punya banyak anak).
 - **MutasiSambung**: riwayat pindah kelompok.
 - **User** (admin/pengurus) + **UserScope** (wilayah).

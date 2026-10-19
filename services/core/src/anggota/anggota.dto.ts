@@ -1,4 +1,4 @@
-import { KATEGORI_GENERUS, normalizeWa } from '@platform-acara/shared';
+import { normalizeWa } from '@platform-acara/shared';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { paginationSchema } from '../common/pagination.js';
@@ -21,15 +21,20 @@ const fields = {
   nama: z.string().trim().min(1).max(100),
   jenisKelamin: z.enum(['L', 'P']),
   tanggalLahir: z.iso.date().nullish(),
-  /** Diisi manual dari assessment; null = belum ditentukan. */
-  kategori: z.enum(KATEGORI_GENERUS).nullish(),
+  /** Id kategori (boleh banyak); diisi manual dari assessment. Dikirim = ganti semua. */
+  kategoriIds: z.array(z.string().min(1)).max(20),
   noWa: noWaField,
   status: z.enum(['AKTIF', 'PINDAH', 'NONAKTIF']),
   fotoUrl: z.url().nullish(),
 };
 
 export class CreateAnggotaDto extends createZodDto(
-  z.object({ ...fields, status: fields.status.default('AKTIF'), kelompokId: z.string().min(1) }),
+  z.object({
+    ...fields,
+    status: fields.status.default('AKTIF'),
+    kategoriIds: fields.kategoriIds.default([]),
+    kelompokId: z.string().min(1),
+  }),
 ) {}
 
 /** Pindah kelompok lewat /anggota/:id/mutasi, bukan PATCH. */
@@ -43,8 +48,8 @@ export class ListAnggotaQuery extends createZodDto(
     kelompokId: z.string().optional(),
     status: z.enum(['AKTIF', 'PINDAH', 'NONAKTIF']).optional(),
     jenisKelamin: z.enum(['L', 'P']).optional(),
-    /** `BELUM` = anggota yang kategorinya belum diisi. */
-    kategori: z.enum([...KATEGORI_GENERUS, 'BELUM']).optional(),
+    /** Id kategori, atau `BELUM` = anggota yang belum punya kategori. */
+    kategoriId: z.string().min(1).optional(),
   }),
 ) {}
 

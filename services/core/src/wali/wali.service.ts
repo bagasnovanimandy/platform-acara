@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AnggotaPublisher } from '../anggota/anggota-publisher.service.js';
+import { diffFields } from '../audit/audit.js';
+import { type AuditEntry, AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { forbiddenScope, notFound } from '../common/app-error.js';
 import { type Paginated, skipTake } from '../common/pagination.js';
@@ -27,6 +29,7 @@ export class WaliService {
     private readonly prisma: PrismaService,
     private readonly scopes: ScopeService,
     private readonly publisher: AnggotaPublisher,
+    private readonly audit: AuditService,
   ) {}
 
   async list(user: AuthUser, q: ListWaliQuery): Promise<Paginated<unknown>> {
@@ -71,6 +74,7 @@ export class WaliService {
       data: { nama: dto.nama, noWa: dto.noWa, anak: { create: dto.anak } },
       include: waliInclude,
     });
+    await this.recordAnak(user, wali.anak, () => `Wali ${wali.nama} (${wali.noWa}) ditautkan`);
     await this.publisher.publishIds(dto.anak.map((a) => a.anggotaId));
     return wali;
   }
@@ -78,6 +82,15 @@ export class WaliService {
   async update(user: AuthUser, id: string, dto: UpdateWaliDto) {
     const current = await this.get(user, id);
     const wali = await this.prisma.wali.update({ where: { id }, data: dto, include: waliInclude });
+    const changes = diffFields(current, dto);
+    if (Object.keys(changes).length > 0) {
+      await this.recordAnak(
+        user,
+        wali.anak,
+        () => `Data wali ${current.nama} diubah: ${Object.keys(changes).join(', ')}`,
+        changes,
+      );
+    }
     if (dto.noWa && dto.noWa !== current.noWa) {
       await this.publisher.publishIds(wali.anak.map((a) => a.anggotaId));
     }
@@ -96,7 +109,34 @@ export class WaliService {
       update: { hubungan: dto.hubungan },
     });
     await this.publisher.publishIds([dto.anggotaId]);
-    return this.prisma.wali.findUniqueOrThrow({ where: { id }, include: waliInclude });
+    const wali = await this.prisma.wali.findUniqueOrThrow({ where: { id }, include: waliInclude });
+    await this.recordAnak(
+      user,
+      wali.anak.filter((a) => a.anggotaId === dto.anggotaId),
+      () => `Wali ${wali.nama} (${wali.noWa}) ditautkan sebagai ${dto.hubungan}`,
+    );
+    return wali;
+  }
+
+  /** Riwayat wali dicatat pada tiap anak, supaya muncul di riwayat anggota. */
+  private async recordAnak(
+    user: AuthUser,
+    anak: { anggotaId: string; anggota: { kelompokId: string } }[],
+    ringkasan: () => string,
+    data?: AuditEntry['data'],
+  ): Promise<void> {
+    const entries: AuditEntry[] = [];
+    for (const a of anak) {
+      entries.push({
+        aksi: 'WALI',
+        entitas: 'Anggota',
+        entitasId: a.anggotaId,
+        ringkasan: ringkasan(),
+        data,
+        wilayah: await this.audit.wilayahKelompok(a.anggota.kelompokId),
+      });
+    }
+    await this.audit.record(user, entries);
   }
 
   private async assertAnak(scope: Scope, ids: string[]): Promise<void> {

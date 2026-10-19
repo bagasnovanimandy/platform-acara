@@ -14,7 +14,7 @@ import {
 import { WilayahService } from './wilayah.service.js';
 
 @Controller('wilayah')
-@Roles('ADMIN', 'PENGURUS')
+@Roles('ADMIN', 'PENGURUS', 'AUDITOR')
 export class WilayahController {
   constructor(private readonly wilayah: WilayahService) {}
 
@@ -30,8 +30,8 @@ export class WilayahController {
 
   @Post('daerah')
   @Roles('SUPER_ADMIN')
-  createDaerah(@Body() dto: CreateDaerahDto) {
-    return this.wilayah.createDaerah(dto);
+  createDaerah(@CurrentUser() user: AuthUser, @Body() dto: CreateDaerahDto) {
+    return this.wilayah.createDaerah(user, dto);
   }
 
   @Patch('daerah/:id')

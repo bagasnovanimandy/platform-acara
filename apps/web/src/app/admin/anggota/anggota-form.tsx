@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { api, errorMessage } from '@/lib/api';
+import { useKategori } from '@/lib/queries';
 import type { Anggota, Daerah } from '@/lib/types';
 
 /** Dialog tambah (anggota = null) atau ubah anggota. Kelompok hanya dipilih saat tambah; pindah lewat mutasi. */
@@ -33,6 +34,7 @@ export function AnggotaFormDialog({
 }) {
   const qc = useQueryClient();
   const [wilayah, setWilayah] = useState<WilayahValue>(EMPTY_WILAYAH);
+  const kategori = useKategori();
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       anggota
@@ -40,6 +42,7 @@ export function AnggotaFormDialog({
         : api('/anggota', { method: 'POST', body }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['anggota'] });
+      await qc.invalidateQueries({ queryKey: ['kategori'] });
       onOpenChange(false);
     },
   });
@@ -51,7 +54,7 @@ export function AnggotaFormDialog({
       nama: f.get('nama'),
       jenisKelamin: f.get('jenisKelamin'),
       tanggalLahir: f.get('tanggalLahir') || null,
-      kategori: f.get('kategori') || null,
+      kategoriIds: f.getAll('kategoriIds'),
       noWa: f.get('noWa') || null,
       status: f.get('status'),
     };
@@ -101,7 +104,11 @@ export function AnggotaFormDialog({
               />
             </div>
           </div>
-          <KategoriPicker name="kategori" defaultValue={anggota?.kategori ?? null} />
+          <KategoriPicker
+            name="kategoriIds"
+            options={kategori.data?.items ?? []}
+            defaultValue={anggota?.kategori.map((k) => k.id) ?? []}
+          />
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="noWa">No WA</Label>

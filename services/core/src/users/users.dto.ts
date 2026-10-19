@@ -10,7 +10,7 @@ const fields = {
   nama: z.string().trim().min(1).max(100),
   email: z.email().transform((v) => v.toLowerCase()),
   password: z.string().min(8, 'Password minimal 8 karakter').max(200),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'PENGURUS']),
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'PENGURUS', 'AUDITOR']),
   noWa: noWaField,
   anggotaId: z.string().min(1).nullish(),
   scopes,

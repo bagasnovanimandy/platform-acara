@@ -33,6 +33,7 @@ pnpm dev
 ```
 Buka http://localhost:3000/login dan masuk dengan `admin@platform-acara.local` / `admin12345`
 (ubah lewat `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` di `services/core/.env`).
+Contoh peran lain (password `contoh12345`): `admin.daerah@…`, `admin.selatan@…` (admin desa), `auditor@…` (auditor daerah), semua `@platform-acara.local`.
 
 Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api/health`.
 `/health` service mengembalikan 503 bila database tidak terhubung.
@@ -48,9 +49,11 @@ Skema acara & wabot masih draft tanpa migrasi; untuk mencoba, `pnpm --filter @pl
 Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi oleh Traefik).
 - `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `GET /auth/.well-known/jwks.json`
 - `GET /wilayah/tree`, `GET|POST|PATCH /wilayah/daerah|desa|kelompok`
-- `GET|POST|PATCH /anggota`, `POST /anggota/:id/mutasi`, `POST /anggota/import?dryRun=true`, `GET /anggota/import/template`
+- `GET|POST|PATCH /anggota` (filter `kategoriId`, `BELUM` = tanpa kategori), `GET /anggota/:id/riwayat`, `POST /anggota/:id/mutasi`, `POST /anggota/import?dryRun=true`, `GET /anggota/import/template`
 - `GET|POST|PATCH /wali`, `POST /wali/:id/anak`
-- `GET|POST|PATCH /users` (SUPER_ADMIN)
+- `GET|POST|PATCH /kategori` (ubah: SUPER_ADMIN / admin daerah)
+- `GET|POST|PATCH /users` (SUPER_ADMIN semua; ADMIN untuk pengguna di dalam wilayahnya)
+- `GET /audit` (riwayat perubahan; ADMIN, AUDITOR, sesuai wilayah)
 - `GET /internal/anggota?ids=…`, `GET /internal/setting?prefix=…` (header `x-internal-key`)
 
 Error selalu `{ code, message, details? }`.

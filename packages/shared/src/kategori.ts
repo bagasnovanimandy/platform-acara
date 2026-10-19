@@ -1,31 +1,38 @@
 /**
- * Kategori generus. Diisi manual per anggota oleh admin berdasarkan assessment tersendiri,
- * bukan dihitung dari tanggal lahir.
+ * Kategori peserta (Caberawit, Remaja, Dewasa, Ibu-ibu, …) adalah daftar yang dikelola admin
+ * di core (tabel Kategori). Satu anggota boleh punya banyak kategori; diisi manual dari
+ * assessment, tidak dihitung dari umur.
  */
-export const KATEGORI_GENERUS = ['CABERAWIT', 'PRAREMAJA', 'REMAJA', 'USIA_NIKAH'] as const;
 
-export type KategoriGenerus = (typeof KATEGORI_GENERUS)[number];
+/** Warna yang boleh dipilih untuk kategori (nama palet di UI). */
+export const KATEGORI_WARNA = [
+  'slate',
+  'amber',
+  'sky',
+  'emerald',
+  'violet',
+  'indigo',
+  'teal',
+  'stone',
+  'rose',
+  'cyan',
+  'lime',
+  'orange',
+  'fuchsia',
+] as const;
 
-export const KATEGORI_GENERUS_LABEL: Record<KategoriGenerus, string> = {
-  CABERAWIT: 'Caberawit',
-  PRAREMAJA: 'Pra-remaja',
-  REMAJA: 'Remaja',
-  USIA_NIKAH: 'Usia nikah',
-};
+export type KategoriWarna = (typeof KATEGORI_WARNA)[number];
 
-/** Teks bebas (mis. "Pra Remaja", "usia-nikah") → kategori; `null` bila tidak dikenali. */
-export function parseKategori(v: string): KategoriGenerus | null {
-  const key = v
+/** Kode kategori dari nama: "Ibu-ibu" → "IBU_IBU". */
+export function kodeKategori(nama: string): string {
+  return nama
     .trim()
     .toUpperCase()
-    .replace(/[\s_-]+/g, '');
-  const alias: Record<string, KategoriGenerus> = {
-    CABERAWIT: 'CABERAWIT',
-    CABERAWITH: 'CABERAWIT',
-    PRAREMAJA: 'PRAREMAJA',
-    REMAJA: 'REMAJA',
-    USIANIKAH: 'USIA_NIKAH',
-    UN: 'USIA_NIKAH',
-  };
-  return alias[key] ?? null;
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/** Nama untuk dicocokkan (abaikan huruf besar, spasi, tanda hubung): "Pra Remaja" = "pra-remaja". */
+export function kunciKategori(v: string): string {
+  return v.toUpperCase().replace(/[^A-Z0-9]+/g, '');
 }

@@ -45,6 +45,21 @@ const selatan = tree[0].desa.find((d) => d.nama === 'Desa Selatan');
 const utara = tree[0].desa.find((d) => d.nama === 'Desa Utara');
 const kelMelati = selatan.kelompok.find((k) => k.nama === 'Kelompok Melati');
 const kelAnggrek = utara.kelompok.find((k) => k.nama === 'Kelompok Anggrek');
+const kategoriList = (await api('GET', '/kategori', { token: sa })).json;
+const kat = Object.fromEntries(kategoriList.items.map((k) => [k.kode, k.id]));
+check('daftar kategori awal tersedia', kat.CABERAWIT && kat.IBU_IBU && kategoriList.bisaKelola);
+const katBaru = await api('POST', '/kategori', {
+  token: sa,
+  body: { nama: `Remaja Putri ${Date.now() % 100000}`, warna: 'fuchsia' },
+});
+check(
+  'super admin menambah kategori',
+  katBaru.status === 201 && katBaru.json.kode.startsWith('REMAJA_PUTRI'),
+);
+check(
+  'kategori duplikat → 409',
+  (await api('POST', '/kategori', { token: sa, body: { nama: katBaru.json.nama } })).status === 409,
+);
 
 const email = `admin.selatan.${Date.now()}@x.id`;
 const u = await api('POST', '/users', {
@@ -68,7 +83,65 @@ check(
   JSON.stringify(noScope.json),
 );
 const ad = await login(email, 'rahasia123');
-check('ADMIN tidak bisa akses /users', (await api('GET', '/users', { token: ad })).status === 403);
+const usersAd = (await api('GET', '/users', { token: ad })).json;
+check(
+  'admin desa hanya melihat pengguna di desanya',
+  Array.isArray(usersAd) &&
+    usersAd.some((x) => x.email === email) &&
+    usersAd.every((x) => x.role !== 'SUPER_ADMIN' && x.scopes.every((sc) => sc.level !== 'DAERAH')),
+  JSON.stringify(usersAd).slice(0, 200),
+);
+check(
+  'admin desa tidak bisa membuat admin daerah',
+  (
+    await api('POST', '/users', {
+      token: ad,
+      body: {
+        nama: 'X',
+        email: `y${Date.now()}@x.id`,
+        password: 'rahasia123',
+        role: 'ADMIN',
+        scopes: [{ level: 'DAERAH', refId: tree[0].id }],
+      },
+    })
+  ).status === 403,
+);
+check(
+  'admin desa tidak bisa membuat super admin',
+  (
+    await api('POST', '/users', {
+      token: ad,
+      body: {
+        nama: 'X',
+        email: `z${Date.now()}@x.id`,
+        password: 'rahasia123',
+        role: 'SUPER_ADMIN',
+      },
+    })
+  ).status === 403,
+);
+const auditorEmail = `auditor.melati.${Date.now()}@x.id`;
+const auditorRes = await api('POST', '/users', {
+  token: ad,
+  body: {
+    nama: 'Auditor Melati',
+    email: auditorEmail,
+    password: 'rahasia123',
+    role: 'AUDITOR',
+    scopes: [{ level: 'KELOMPOK', refId: kelMelati.id }],
+  },
+});
+check(
+  'admin desa membuat auditor kelompok',
+  auditorRes.status === 201,
+  JSON.stringify(auditorRes.json),
+);
+const au = await login(auditorEmail, 'rahasia123');
+check(
+  'kategori hanya dikelola admin daerah ke atas',
+  (await api('POST', '/kategori', { token: ad, body: { nama: 'Coba' } })).json.code ===
+    'OUT_OF_SCOPE',
+);
 
 const listSa = (await api('GET', '/anggota?pageSize=200', { token: sa })).json;
 const listAd = (await api('GET', '/anggota?pageSize=200', { token: ad })).json;
@@ -123,7 +196,7 @@ const created = await api('POST', '/anggota', {
     nama: 'Uji Coba',
     jenisKelamin: 'L',
     tanggalLahir: '2011-01-02',
-    kategori: 'REMAJA',
+    kategoriIds: [kat.REMAJA],
     noWa: `0857 ${String(Date.now()).slice(-8)}`,
     kelompokId: kelMelati.id,
   },
@@ -133,7 +206,7 @@ check(
   created.status === 201 &&
     /^JS-\d{4}$/.test(created.json.kode) &&
     created.json.noWa.startsWith('62857') &&
-    created.json.kategori === 'REMAJA',
+    created.json.kategori.map((k) => k.kode).join() === 'REMAJA',
   JSON.stringify(created.json),
 );
 check(
@@ -176,29 +249,32 @@ check(
 );
 const badKategori = await api('PATCH', `/anggota/${created.json.id}`, {
   token: ad,
-  body: { kategori: 'DEWASA' },
+  body: { kategoriIds: ['tidak-ada'] },
 });
-check('kategori tidak dikenal → VALIDATION_ERROR', badKategori.json.code === 'VALIDATION_ERROR');
+check('kategori tidak dikenal → KATEGORI_INVALID', badKategori.json.code === 'KATEGORI_INVALID');
 check(
-  'kategori diubah manual, bukan dari umur',
+  'kategori diubah manual, boleh lebih dari satu',
   (
     await api('PATCH', `/anggota/${created.json.id}`, {
       token: ad,
-      body: { kategori: 'USIA_NIKAH' },
+      body: { kategoriIds: [kat.IBU_IBU, kat.USIA_NIKAH] },
     })
-  ).json.kategori === 'USIA_NIKAH',
+  ).json.kategori
+    .map((k) => k.kode)
+    .join() === 'USIA_NIKAH,IBU_IBU',
 );
-const byKategori = (await api('GET', '/anggota?pageSize=200&kategori=USIA_NIKAH', { token: ad }))
-  .json;
+const byKategori = (
+  await api('GET', `/anggota?pageSize=200&kategoriId=${kat.USIA_NIKAH}`, { token: ad })
+).json;
 check(
   'filter kategori',
   byKategori.items.some((a) => a.id === created.json.id) &&
-    byKategori.items.every((a) => a.kategori === 'USIA_NIKAH'),
+    byKategori.items.every((a) => a.kategori.some((k) => k.kode === 'USIA_NIKAH')),
 );
-const belum = (await api('GET', '/anggota?pageSize=200&kategori=BELUM', { token: sa })).json;
+const belum = (await api('GET', '/anggota?pageSize=200&kategoriId=BELUM', { token: sa })).json;
 check(
   'filter kategori belum diisi',
-  belum.total > 0 && belum.items.every((a) => a.kategori === null),
+  belum.total > 0 && belum.items.every((a) => a.kategori.length === 0),
   `${belum.total}`,
 );
 
@@ -265,7 +341,7 @@ for (let i = 0; i < 100; i++) {
     `Import ${stamp} ${i}`,
     i % 2 ? 'P' : 'L',
     `${(i % 28) + 1}/0${(i % 9) + 1}/2012`,
-    ['', 'Caberawit', 'pra remaja', 'Remaja', 'Usia Nikah'][i % 5],
+    ['', 'Caberawit', 'pra remaja', 'Remaja', 'Usia Nikah, Ibu-ibu'][i % 5],
     i % 3 === 0 ? `0877${stamp}${String(i).padStart(3, '0')}` : '',
     i % 3 === 1 ? `0878${stamp}${String(i).padStart(3, '0')}` : '',
     'Ortu',
@@ -303,7 +379,7 @@ ws.addRow([
   'Salah Kategori',
   'P',
   '',
-  'Dewasa',
+  'Astronot',
   '',
   '',
   '',
@@ -343,8 +419,9 @@ check(
 );
 check(
   'kolom Kategori ikut diimpor (kosong = belum diisi)',
-  after.items.filter((a) => a.kategori === 'PRAREMAJA').length === 20 &&
-    after.items.filter((a) => a.kategori === null).length === 20,
+  after.items.filter((a) => a.kategori.some((k) => k.kode === 'PRAREMAJA')).length === 20 &&
+    after.items.filter((a) => a.kategori.length === 2).length === 20 &&
+    after.items.filter((a) => a.kategori.length === 0).length === 20,
 );
 const again = await api('POST', '/anggota/import?dryRun=true', { token: ad, form: form() });
 check(
@@ -375,8 +452,51 @@ check(
   'internal anggota memakai format event',
   internal[0]?.namaDesa === 'Desa Utara' &&
     internal[0]?.waliNoWa.length === 1 &&
-    internal[0]?.kategori === 'USIA_NIKAH',
+    internal[0]?.kategori.join() === 'IBU_IBU,USIA_NIKAH',
   JSON.stringify(internal),
+);
+
+const riwayat = (await api('GET', `/anggota/${created.json.id}/riwayat`, { token: sa })).json;
+const aksi = new Set(riwayat.map((r) => r.aksi));
+check(
+  'riwayat anggota: tambah, ubah, wali, pindah',
+  ['CREATE', 'UPDATE', 'WALI', 'MUTASI'].every((x) => aksi.has(x)) &&
+    riwayat.every((r) => r.userNama === 'Admin Selatan'),
+  JSON.stringify([...aksi]),
+);
+const ubahKat = riwayat.find((r) => r.aksi === 'UPDATE' && r.data.kategori);
+check(
+  'riwayat mencatat sebelum & sesudah',
+  ubahKat?.data.kategori[0] === '["Remaja"]',
+  JSON.stringify(ubahKat),
+);
+check(
+  'auditor bisa melihat anggota',
+  (await api('GET', '/anggota?pageSize=5', { token: au })).status === 200,
+);
+check(
+  'auditor tidak bisa mengubah data',
+  (
+    await api('POST', '/anggota', {
+      token: au,
+      body: { nama: 'X', jenisKelamin: 'L', kelompokId: kelMelati.id },
+    })
+  ).status === 403,
+);
+const auditAu = (await api('GET', '/audit?pageSize=200', { token: au })).json;
+check(
+  'auditor kelompok hanya melihat riwayat kelompoknya',
+  auditAu.total > 0 && auditAu.items.every((r) => r.kelompokId === kelMelati.id),
+  `${auditAu.total}`,
+);
+const auditSa = (await api('GET', '/audit?entitas=Kategori', { token: sa })).json;
+check(
+  'super admin melihat riwayat kategori',
+  auditSa.items.some((r) => r.entitasId === katBaru.json.id),
+);
+check(
+  'auditor tidak melihat riwayat kategori',
+  (await api('GET', '/audit?entitas=Kategori', { token: au })).json.total === 0,
 );
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exitCode = fail ? 1 : 0;

@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./kategori": {
+      "types": "./dist/kategori.d.ts",
+      "default": "./dist/kategori.js"
     }
   },
   "scripts": {
