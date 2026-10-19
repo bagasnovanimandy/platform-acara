@@ -1,8 +1,40 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
+const perangkat = z.string().max(200).optional();
+
+/** Login perangkat: token QR sekali pakai, atau kode pintu + PIN. */
 export class OpLoginDto extends createZodDto(
-  z.object({ token: z.string().min(16).max(200), perangkat: z.string().max(200).optional() }),
+  z
+    .object({
+      token: z.string().min(16).max(200).optional(),
+      kode: z
+        .string()
+        .trim()
+        .transform((s) => s.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+        .pipe(z.string().length(6, 'Kode pintu 6 karakter'))
+        .optional(),
+      pin: z
+        .string()
+        .regex(/^\d{6}$/, 'PIN 6 angka')
+        .optional(),
+      perangkat,
+    })
+    .refine((d) => d.token || (d.kode && d.pin), 'Isi token QR, atau kode pintu dan PIN'),
+) {}
+
+export class HeartbeatDto extends createZodDto(
+  z.object({
+    online: z.boolean(),
+    sedangInput: z.boolean(),
+    antrean: z.number().int().min(0).max(100_000),
+    baterai: z.number().int().min(0).max(100).nullish(),
+    perangkat,
+  }),
+) {}
+
+export class GeneratePintuDto extends createZodDto(
+  z.object({ jumlah: z.number().int().min(1).max(20) }),
 ) {}
 
 const waktu = z.iso.datetime({ offset: true });

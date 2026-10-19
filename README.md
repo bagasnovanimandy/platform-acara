@@ -38,7 +38,7 @@ Contoh peran lain (password `contoh12345`): `admin.daerah@…`, `admin.selatan@�
 Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api/health`.
 `/health` service mengembalikan 503 bila database tidak terhubung.
 
-Operator (`/op`): di detail acara buka tab Kehadiran → "Buka perangkat pintu (uji)", lalu buka tautannya di HP pintu.
+Operator (`/op`): di detail acara buka tab Pintu → isi jumlah → "Buat pintu", lalu cetak kartu. HP pintu memindai QR (sekali pakai, 24 jam) atau membuka `/op` dan mengisi kode pintu + PIN. Tab Pintu juga memantau tiap perangkat secara langsung.
 Model wajah disalin otomatis ke `apps/web/public/models` saat `dev`/`build`. Mode offline (service worker) hanya aktif di build produksi (`pnpm build` lalu `next start`).
 `OPERATOR_JWT_SECRET` di `services/acara/.env` wajib diganti di produksi.
 
@@ -71,8 +71,8 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `GET|POST /acara/:id/foto`, `GET /foto/:id/file?thumb=1`, `DELETE /foto/:id`
 - `GET /anggota/:id/acara` (acara yang diikuti), `GET /anggota-ref/cari?q=`
 - `GET /dashboard/acara` (statistik acara sesuai wilayah)
-- `POST /sesi/:id/operator/uji` (ADMIN, tautan perangkat pintu sementara), `GET /sesi/:id/kehadiran`
-- Perangkat pintu (token operator, bukan token pengguna): `POST /op/login`, `GET /op/paket`, `POST /op/absensi/batch`, `POST /op/tamu`
+- `POST /sesi/:id/operator/generate {jumlah}` (ADMIN), `GET /sesi/:id/operator`, `GET /sesi/:id/monitor` (SSE), `POST /operator/:id/revoke|reset-pin` (ADMIN), `GET /sesi/:id/kehadiran`
+- Perangkat pintu (token operator, bukan token pengguna): `POST /op/login {token}` atau `{kode, pin}`, `GET /op/paket`, `POST /op/heartbeat`, `POST /op/absensi/batch`, `POST /op/tamu`
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.

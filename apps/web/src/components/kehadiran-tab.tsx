@@ -1,12 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Copy, MonitorSmartphone, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
   Table,
@@ -45,8 +45,6 @@ const METODE: Record<Kehadiran['items'][number]['metode'], string> = {
 
 export function KehadiranTab({ acara }: { acara: AcaraDetail }) {
   const [sesiId, setSesiId] = useState(acara.sesi[0]?.id ?? '');
-  const [link, setLink] = useState<{ label: string; url: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['kehadiran', sesiId],
     queryFn: () => acaraApi<Kehadiran>(`/sesi/${sesiId}/kehadiran`),
@@ -57,32 +55,13 @@ export function KehadiranTab({ acara }: { acara: AcaraDetail }) {
   if (acara.sesi.length === 0)
     return <p className="text-sm text-muted-foreground">Tambahkan sesi dulu.</p>;
 
-  async function bukaPerangkat() {
-    setError(null);
-    try {
-      const r = await acaraApi<{ label: string; url: string }>(`/sesi/${sesiId}/operator/uji`, {
-        method: 'POST',
-      });
-      setLink({ label: r.label, url: `${window.location.origin}${r.url}` });
-      await q.refetch();
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }
-
   const k = q.data;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Sesi
-          <NativeSelect
-            value={sesiId}
-            onChange={(e) => {
-              setSesiId(e.target.value);
-              setLink(null);
-            }}
-          >
+          <NativeSelect value={sesiId} onChange={(e) => setSesiId(e.target.value)}>
             {acara.sesi.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.nama}
@@ -93,37 +72,7 @@ export function KehadiranTab({ acara }: { acara: AcaraDetail }) {
         <Button variant="outline" onClick={() => q.refetch()} aria-label="Muat ulang">
           <RefreshCw /> Muat ulang
         </Button>
-        {acara.bisaKelola && (
-          <Button onClick={bukaPerangkat}>
-            <MonitorSmartphone /> Buka perangkat pintu (uji)
-          </Button>
-        )}
       </div>
-
-      {error && <Alert variant="destructive">{error}</Alert>}
-      {link && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{link.label} siap dipakai</CardTitle>
-            <CardDescription>
-              Buka tautan ini sekali di HP atau tablet pintu. Tautan hanya bisa dipakai satu kali.
-              QR dan PIN menyusul di fase 4.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1.5 text-xs break-all">
-              {link.url}
-            </code>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigator.clipboard?.writeText(link.url)}
-            >
-              <Copy /> Salin
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {q.error && <Alert variant="destructive">{errorMessage(q.error)}</Alert>}
       {k && (

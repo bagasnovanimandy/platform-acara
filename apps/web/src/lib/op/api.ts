@@ -39,6 +39,29 @@ export function loginOperator(token: string): Promise<OpSession> {
   });
 }
 
+export function loginOperatorPin(kode: string, pin: string): Promise<OpSession> {
+  return req('/login', {
+    method: 'POST',
+    body: JSON.stringify({ kode, pin, perangkat: navigator.userAgent.slice(0, 200) }),
+  });
+}
+
+export interface Heartbeat {
+  online: boolean;
+  sedangInput: boolean;
+  antrean: number;
+  baterai?: number | null;
+}
+
+export function kirimHeartbeat(s: OpSession, hb: Heartbeat): Promise<{ ok: boolean }> {
+  return req('/heartbeat', { method: 'POST', token: s.token, body: JSON.stringify(hb) });
+}
+
+/** Pesan untuk layar login saat token perangkat ditolak. */
+export function alasanKeluar(e: OpError): string | undefined {
+  return e.code === 'OPERATOR_DICABUT' ? 'Akses pintu ini dicabut admin.' : undefined;
+}
+
 export function ambilPaket(s: OpSession): Promise<Paket> {
   return req('/paket', { token: s.token });
 }

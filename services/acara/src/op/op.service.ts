@@ -1,17 +1,20 @@
-import { randomBytes } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
+import argon2 from 'argon2';
 import { AcaraService } from '../acara/acara.service.js';
 import { pesertaWhere } from '../acara/peserta.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { AppError, notFound } from '../common/app-error.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { QR_BERLAKU_MS } from './kredensial.js';
+import { MonitorBus } from './monitor-bus.js';
 import type { AbsensiItem, OpLoginDto } from './op.dto.js';
 import type { OperatorCtx } from './operator.guard.js';
 import { signOperatorToken } from './operator-token.js';
 
-/** Token operator berlaku sampai sesi selesai + 2 jam (HANDOVER §5.2). */
-const MASA_BERLAKU_MS = 2 * 3600_000;
+/** 5 PIN salah berturut-turut mengunci pintu itu 5 menit. */
+const PIN_MAKS_GAGAL = 5;
+const PIN_KUNCI_MS = 5 * 60_000;
 
 export type HasilStatus = 'BARU' | 'LEBIH_AWAL' | 'DUPLIKAT' | 'SUDAH_DITERIMA' | 'DITOLAK';
 export interface HasilItem {
@@ -27,62 +30,85 @@ export class OpService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly acara: AcaraService,
+    private readonly bus: MonitorBus,
   ) {}
 
-  /**
-   * Sementara (sampai fase 4): admin membuat satu akses perangkat uji untuk sesi.
-   * Mengembalikan token sekali pakai untuk `/op/login?t=…`.
-   */
-  async buatOperatorUji(user: AuthUser, sesiId: string) {
-    const sesi = await this.prisma.sesi.findFirst({ where: { id: sesiId, deletedAt: null } });
-    if (!sesi) throw notFound('Sesi', sesiId);
-    await this.acara.manageable(user, sesi.acaraId);
-    const last = await this.prisma.operatorSession.aggregate({
-      where: { sesiId },
-      _max: { nomor: true },
-    });
-    const nomor = (last._max.nomor ?? 0) + 1;
-    const qrToken = randomBytes(24).toString('base64url');
-    const op = await this.prisma.operatorSession.create({
+  /** Login perangkat dengan token QR (sekali pakai, 24 jam) atau kode pintu + PIN. */
+  async login(dto: OpLoginDto) {
+    const now = new Date();
+    const op = dto.token
+      ? await this.loginQr(dto.token, now)
+      : await this.loginPin(dto.kode ?? '', dto.pin ?? '', now);
+    await this.prisma.operatorSession.update({
+      where: { id: op.id },
       data: {
-        sesiId,
-        nomor,
-        label: `Pintu ${nomor}`,
-        pinHash: '!', // PIN dibuat di fase 4
-        qrToken,
-        expiresAt: new Date(sesi.selesai.getTime() + MASA_BERLAKU_MS),
-        dibuatOleh: user.id,
+        lastSeenAt: now,
+        ...(dto.perangkat ? { perangkat: dto.perangkat.slice(0, 200) } : {}),
       },
     });
-    return { id: op.id, label: op.label, token: qrToken, url: `/op/login?t=${qrToken}` };
-  }
-
-  /** Tukar token QR sekali pakai dengan token operator. */
-  async login(dto: OpLoginDto) {
-    const op = await this.prisma.operatorSession.findUnique({
-      where: { qrToken: dto.token },
-      include: { sesi: { include: { acara: true } } },
-    });
-    const now = new Date();
-    if (!op || op.revokedAt || op.expiresAt < now) {
-      throw new AppError(HttpStatus.UNAUTHORIZED, 'QR_INVALID', 'QR tidak berlaku');
-    }
-    if (op.qrUsedAt) {
-      throw new AppError(HttpStatus.UNAUTHORIZED, 'QR_USED', 'QR sudah dipakai perangkat lain');
-    }
-    const used = await this.prisma.operatorSession.updateMany({
-      where: { id: op.id, qrUsedAt: null },
-      data: { qrUsedAt: now, lastSeenAt: now, perangkat: dto.perangkat?.slice(0, 200) },
-    });
-    if (used.count === 0) {
-      throw new AppError(HttpStatus.UNAUTHORIZED, 'QR_USED', 'QR sudah dipakai perangkat lain');
-    }
+    this.bus.emit(op.sesiId);
     return {
       token: await signOperatorToken({ sid: op.id, sesiId: op.sesiId }, op.expiresAt),
       expiresAt: op.expiresAt,
       operator: { id: op.id, label: op.label },
       sesi: { id: op.sesiId, nama: op.sesi.nama, acara: op.sesi.acara.nama },
     };
+  }
+
+  private async loginQr(token: string, now: Date) {
+    const op = await this.prisma.operatorSession.findUnique({
+      where: { qrToken: token },
+      include: { sesi: { include: { acara: true } } },
+    });
+    if (
+      !op ||
+      op.revokedAt ||
+      op.expiresAt < now ||
+      op.qrIssuedAt.getTime() + QR_BERLAKU_MS < now.getTime()
+    ) {
+      throw new AppError(HttpStatus.UNAUTHORIZED, 'QR_INVALID', 'QR tidak berlaku');
+    }
+    const used = await this.prisma.operatorSession.updateMany({
+      where: { id: op.id, qrUsedAt: null },
+      data: { qrUsedAt: now },
+    });
+    if (used.count === 0) {
+      throw new AppError(HttpStatus.UNAUTHORIZED, 'QR_USED', 'QR sudah dipakai perangkat lain');
+    }
+    return op;
+  }
+
+  private async loginPin(kode: string, pin: string, now: Date) {
+    const op = await this.prisma.operatorSession.findUnique({
+      where: { kode },
+      include: { sesi: { include: { acara: true } } },
+    });
+    const salah = () =>
+      new AppError(HttpStatus.UNAUTHORIZED, 'PIN_INVALID', 'Kode pintu atau PIN salah');
+    if (!op || op.revokedAt || op.expiresAt < now) throw salah();
+    if (op.terkunciSampai && op.terkunciSampai > now) {
+      throw new AppError(
+        HttpStatus.TOO_MANY_REQUESTS,
+        'PIN_TERKUNCI',
+        'Terlalu banyak PIN salah. Coba lagi beberapa menit lagi.',
+        { sampai: op.terkunciSampai },
+      );
+    }
+    if (!(await argon2.verify(op.pinHash, pin))) {
+      const gagal = op.pinGagal + 1;
+      await this.prisma.operatorSession.update({
+        where: { id: op.id },
+        data:
+          gagal >= PIN_MAKS_GAGAL
+            ? { pinGagal: 0, terkunciSampai: new Date(now.getTime() + PIN_KUNCI_MS) }
+            : { pinGagal: gagal },
+      });
+      throw salah();
+    }
+    if (op.pinGagal > 0) {
+      await this.prisma.operatorSession.update({ where: { id: op.id }, data: { pinGagal: 0 } });
+    }
+    return op;
   }
 
   /**
@@ -178,6 +204,7 @@ export class OpService {
       where: { id: op.id },
       data: { lastSeenAt: new Date(), lastScanAt: lastScan },
     });
+    this.bus.emit(op.sesiId);
     const hitung = (s: HasilStatus) => hasil.filter((h) => h.status === s).length;
     return {
       hasil,

@@ -21,6 +21,7 @@
     "@platform-acara/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "argon2": "^0.45.1",
     "bullmq": "^6.3.17",
     "dotenv": "^18.0.8",
     "ioredis": "^5.11.1",

@@ -34,8 +34,16 @@ type Kartu =
   | { jenis: 'sudah'; nama: string; kelompok: string }
   | { jenis: 'tamu'; nama: string };
 
-export function OperatorApp({ session, onExpired }: { session: OpSession; onExpired: () => void }) {
-  const data = useOpData(session, onExpired);
+export function OperatorApp({
+  session,
+  onExpired,
+}: {
+  session: OpSession;
+  onExpired: (alasan?: string) => void;
+}) {
+  // Sheet terbuka = operator sedang mengetik (dilaporkan lewat heartbeat).
+  const [sheet, setSheet] = useState<'cari' | 'tamu' | null>(null);
+  const data = useOpData(session, onExpired, sheet !== null);
   const { paket, pesertaById, sudahHadir, catat } = data;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -45,7 +53,6 @@ export function OperatorApp({ session, onExpired }: { session: OpSession; onExpi
   const [wajahTerlihat, setWajahTerlihat] = useState(false);
   const [saranCari, setSaranCari] = useState(false);
   const [kartu, setKartu] = useState<Kartu | null>(null);
-  const [sheet, setSheet] = useState<'cari' | 'tamu' | null>(null);
 
   const kartuUntil = useRef(0);
   const cooldown = useRef(new Map<string, number>());
