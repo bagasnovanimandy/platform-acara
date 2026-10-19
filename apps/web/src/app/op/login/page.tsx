@@ -1,13 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { loginOperator, OpError } from '@/lib/op/api';
 import { simpanSesi } from '@/lib/op/session';
 
 const PESAN: Record<string, string> = {
-  QR_INVALID: 'QR tidak dikenali atau sudah kedaluwarsa. Minta QR baru ke admin.',
-  QR_USED: 'QR ini sudah dipakai di perangkat lain. Minta QR baru ke admin.',
+  QR_INVALID: 'QR tidak dikenali atau sudah kedaluwarsa. Masuk dengan kode pintu dan PIN.',
+  QR_USED: 'QR ini sudah dipakai di perangkat lain. Masuk dengan kode pintu dan PIN.',
 };
 
 function Login() {
@@ -43,6 +44,12 @@ function Login() {
           <p className="max-w-sm text-lg text-white/70" role="alert">
             {error}
           </p>
+          <Link
+            href="/op"
+            className="flex h-14 items-center rounded-2xl bg-white px-6 text-lg font-semibold text-black"
+          >
+            Masuk dengan PIN
+          </Link>
         </>
       ) : (
         <p className="text-lg text-white/70">Menghubungkan perangkat…</p>

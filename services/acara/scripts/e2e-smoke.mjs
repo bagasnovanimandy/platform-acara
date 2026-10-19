@@ -56,6 +56,11 @@ const sa = await login(SA_EMAIL, SA_PASSWORD);
 const adminSelatan = await login('admin.selatan@platform-acara.local');
 const auditor = await login('auditor@platform-acara.local');
 check('login SA, admin desa, auditor', sa && adminSelatan && auditor);
+// Resync awal acara-svc berjalan di latar saat start; tunggu salinan anggota lengkap dulu.
+check(
+  'sinkron penuh salinan anggota dari core',
+  (await api('POST', '/sync/anggota?full=true', { token: sa })).status === 201,
+);
 
 check('tanpa token → 401', (await api('GET', '/acara')).status === 401);
 check('token palsu → 401', (await api('GET', '/acara', { token: 'abc.def.ghi' })).status === 401);
@@ -454,17 +459,42 @@ check(
 );
 
 // --- Perangkat pintu (operator) & absensi offline
-const uji = await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: adminSelatan });
+const gen = await api('POST', `/sesi/${sesi.id}/operator/generate`, {
+  token: adminSelatan,
+  body: { jumlah: 2 },
+});
+const [pintu1, pintu2] = gen.json.items ?? [];
 check(
-  'admin membuat akses perangkat uji',
-  uji.status === 201 && uji.json.url.startsWith('/op/login?t='),
+  'admin membuat 2 pintu dengan kode, PIN 6 angka, dan QR',
+  gen.status === 201 &&
+    pintu1?.label === 'Pintu 1' &&
+    pintu2?.label === 'Pintu 2' &&
+    /^[A-Z0-9]{6}$/.test(pintu1.kode) &&
+    /^\d{6}$/.test(pintu1.pin) &&
+    pintu1.url.startsWith('/op/login?t='),
+  JSON.stringify(gen.json).slice(0, 300),
 );
 check(
-  'auditor tidak bisa membuat akses perangkat',
-  (await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: auditor })).status === 403,
+  'auditor tidak bisa membuat pintu',
+  (
+    await api('POST', `/sesi/${sesi.id}/operator/generate`, {
+      token: auditor,
+      body: { jumlah: 1 },
+    })
+  ).status === 403,
 );
+check(
+  'jumlah pintu di luar batas → 400',
+  (
+    await api('POST', `/sesi/${sesi.id}/operator/generate`, {
+      token: adminSelatan,
+      body: { jumlah: 0 },
+    })
+  ).status === 400,
+);
+const qr1 = pintu1.url.split('t=')[1];
 const opLogin = await api('POST', '/op/login', {
-  body: { token: uji.json.token, perangkat: 'e2e' },
+  body: { token: qr1, perangkat: 'e2e' },
 });
 const opToken = opLogin.json.token;
 check(
@@ -473,7 +503,7 @@ check(
 );
 check(
   'token QR sekali pakai',
-  (await api('POST', '/op/login', { body: { token: uji.json.token } })).json.code === 'QR_USED',
+  (await api('POST', '/op/login', { body: { token: qr1 } })).json.code === 'QR_USED',
 );
 check(
   'paket tanpa token operator → 401',
@@ -513,8 +543,19 @@ check(
   'kirim ulang batch yang sama tidak dobel',
   b2.ringkas?.sudahDiterima === N + 1 && b2.ringkas.baru === 0,
 );
-const uji2 = (await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: adminSelatan })).json;
-const op2 = (await api('POST', '/op/login', { body: { token: uji2.token } })).json.token;
+const pinLogin = await api('POST', '/op/login', {
+  body: { kode: pintu2.kode.toLowerCase(), pin: pintu2.pin },
+});
+const op2 = pinLogin.json.token;
+check(
+  'login dengan kode pintu + PIN (huruf kecil diterima)',
+  pinLogin.status === 200 && pinLogin.json.operator.label === 'Pintu 2',
+);
+check(
+  'PIN salah → 401 PIN_INVALID',
+  (await api('POST', '/op/login', { body: { kode: pintu2.kode, pin: '000000' } })).json.code ===
+    'PIN_INVALID' || pintu2.pin === '000000',
+);
 const b3 = (
   await api('POST', '/op/absensi/batch', {
     token: op2,
@@ -573,6 +614,104 @@ check(
       body: { items: [{ metode: 'MANUAL' }] },
     })
   ).status === 400,
+);
+
+// --- Pintu: heartbeat, monitor, kunci PIN, reset, cabut
+const hb = await api('POST', '/op/heartbeat', {
+  token: opToken,
+  body: { online: true, sedangInput: false, antrean: 3, baterai: 80 },
+});
+check('heartbeat perangkat', hb.status === 200);
+check(
+  'heartbeat tanpa token operator → 401',
+  (await api('POST', '/op/heartbeat', { body: { online: true } })).status === 401,
+);
+let daftar = (await api('GET', `/sesi/${sesi.id}/operator`, { token: auditor })).json;
+const p1 = daftar.pintu?.find((p) => p.label === 'Pintu 1');
+check(
+  'daftar pintu: status, antrean, baterai, jumlah input',
+  daftar.pintu?.length === 2 &&
+    p1?.status === 'ONLINE' &&
+    p1.antrean === 3 &&
+    p1.baterai === 80 &&
+    p1.jumlahInput === N + 1 &&
+    p1.qrDipakai === true &&
+    daftar.hadir === N &&
+    !('pin' in p1) &&
+    !('pinHash' in p1),
+  JSON.stringify(daftar).slice(0, 400),
+);
+// SSE: baca event pertama
+const ctl = new AbortController();
+const sse = await fetch(`${B}/sesi/${sesi.id}/monitor`, {
+  headers: { authorization: `Bearer ${auditor}` },
+  signal: ctl.signal,
+});
+let first = '';
+const reader = sse.body.getReader();
+while (!first.includes('\n\n')) first += new TextDecoder().decode((await reader.read()).value);
+ctl.abort();
+const ev = JSON.parse(first.split('data: ')[1].split('\n')[0]);
+check(
+  'monitor SSE mengirim kondisi pintu',
+  sse.headers.get('content-type')?.startsWith('text/event-stream') && ev.pintu?.length === 2,
+  first.slice(0, 200),
+);
+check('monitor tanpa login → 401', (await fetch(`${B}/sesi/${sesi.id}/monitor`)).status === 401);
+const [pintu3] = (
+  await api('POST', `/sesi/${sesi.id}/operator/generate`, {
+    token: adminSelatan,
+    body: { jumlah: 1 },
+  })
+).json.items;
+check('pintu berikutnya bernomor lanjut', pintu3?.label === 'Pintu 3');
+const pinSalah = pintu3.pin === '111111' ? '222222' : '111111';
+for (let i = 0; i < 5; i++)
+  await api('POST', '/op/login', { body: { kode: pintu3.kode, pin: pinSalah } });
+check(
+  '5 PIN salah mengunci pintu sementara',
+  (await api('POST', '/op/login', { body: { kode: pintu3.kode, pin: pintu3.pin } })).json.code ===
+    'PIN_TERKUNCI',
+);
+const reset = await api('POST', `/operator/${pintu3.id}/reset-pin`, { token: adminSelatan });
+check(
+  'reset PIN membuka kunci, PIN lama tidak berlaku',
+  reset.status === 200 &&
+    (reset.json.pin === pintu3.pin ||
+      (await api('POST', '/op/login', { body: { kode: pintu3.kode, pin: pintu3.pin } })).status ===
+        401),
+);
+const op3 = (await api('POST', '/op/login', { body: { kode: pintu3.kode, pin: reset.json.pin } }))
+  .json.token;
+check('login dengan PIN baru', !!op3);
+check(
+  'QR baru dari reset bisa dipakai',
+  (await api('POST', '/op/login', { body: { token: reset.json.url.split('t=')[1] } })).status ===
+    200,
+);
+check(
+  'auditor tidak bisa mencabut pintu',
+  (await api('POST', `/operator/${pintu3.id}/revoke`, { token: auditor })).status === 403,
+);
+check(
+  'cabut pintu',
+  (await api('POST', `/operator/${pintu3.id}/revoke`, { token: adminSelatan })).status === 200,
+);
+check(
+  'perangkat yang dicabut langsung ditolak',
+  (await api('GET', '/op/paket', { token: op3 })).json.code === 'OPERATOR_DICABUT',
+);
+check(
+  'pintu dicabut tidak bisa login lagi',
+  (await api('POST', '/op/login', { body: { kode: pintu3.kode, pin: reset.json.pin } })).status ===
+    401,
+);
+daftar = (await api('GET', `/sesi/${sesi.id}/operator`, { token: adminSelatan })).json;
+check(
+  'status pintu: dicabut & belum ada scan (idle)',
+  daftar.pintu.find((p) => p.id === pintu3.id)?.status === 'DICABUT' &&
+    daftar.pintu.find((p) => p.label === 'Pintu 2')?.status === 'ONLINE',
+  JSON.stringify(daftar.pintu.map((p) => [p.label, p.status])),
 );
 
 // --- Statistik dashboard

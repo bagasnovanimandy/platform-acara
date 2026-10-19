@@ -346,6 +346,17 @@ export class AcaraService {
   }
 
   /** Acara yang boleh diubah user (ADMIN dengan penyelenggara di wilayahnya). */
+  /** Acara terlihat oleh user (tanpa memuat detail). */
+  async visible(user: AuthUser, id: string) {
+    const scope = await this.scopes.forUser(user);
+    const acara = await this.prisma.acara.findFirst({
+      where: { id, deletedAt: null },
+      include: { pesertaRules: true },
+    });
+    if (!acara || !canSeeAcara(scope, acara)) throw notFound('Acara', id);
+    return acara;
+  }
+
   async manageable(user: AuthUser, id: string) {
     const scope = await this.scopes.forUser(user);
     const acara = await this.prisma.acara.findFirst({

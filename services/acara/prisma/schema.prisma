@@ -219,24 +219,30 @@ model FotoKegiatan {
 }
 
 model OperatorSession {
-  id           String     @id @default(cuid())
-  sesiId       String
-  sesi         Sesi       @relation(fields: [sesiId], references: [id])
-  label        String // "Pintu 1"
-  nomor        Int
-  pinHash      String
-  qrToken      String     @unique // sekali pakai
-  qrUsedAt     DateTime?  @db.Timestamptz(3)
-  expiresAt    DateTime   @db.Timestamptz(3)
-  revokedAt    DateTime?  @db.Timestamptz(3)
-  lastSeenAt   DateTime?  @db.Timestamptz(3)
-  lastScanAt   DateTime?  @db.Timestamptz(3)
-  antrean      Int        @default(0) // jumlah data belum sinkron (dari heartbeat)
-  perangkat    String? // user agent ringkas
-  dibuatOleh   String
-  absensi      Absensi[]
-  faceEnrolled FaceData[]
-  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  id             String     @id @default(cuid())
+  sesiId         String
+  sesi           Sesi       @relation(fields: [sesiId], references: [id])
+  label          String // "Pintu 1"
+  nomor          Int
+  kode           String     @unique // kode pintu untuk login PIN, mis. "K7QM2D"
+  pinHash        String // argon2
+  pinGagal       Int        @default(0)
+  terkunciSampai DateTime?  @db.Timestamptz(3)
+  qrToken        String     @unique // sekali pakai, berlaku 24 jam sejak qrIssuedAt
+  qrIssuedAt     DateTime   @default(now()) @db.Timestamptz(3)
+  qrUsedAt       DateTime?  @db.Timestamptz(3)
+  expiresAt      DateTime   @db.Timestamptz(3)
+  revokedAt      DateTime?  @db.Timestamptz(3)
+  lastSeenAt     DateTime?  @db.Timestamptz(3)
+  lastScanAt     DateTime?  @db.Timestamptz(3)
+  antrean        Int        @default(0) // jumlah data belum sinkron (dari heartbeat)
+  sedangInput    Boolean    @default(false)
+  baterai        Int? // persen, dari heartbeat bila browser mendukung
+  perangkat      String? // user agent ringkas
+  dibuatOleh     String
+  absensi        Absensi[]
+  faceEnrolled   FaceData[]
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
 
   @@unique([sesiId, nomor])
 }

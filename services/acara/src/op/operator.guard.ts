@@ -42,7 +42,14 @@ export class OperatorGuard implements CanActivate {
       throw unauthorized('Login perangkat kedaluwarsa, scan QR lagi');
     }
     const op = await this.prisma.operatorSession.findUnique({ where: { id: sid } });
-    if (!op || op.revokedAt || op.expiresAt < new Date()) {
+    if (op?.revokedAt) {
+      throw new AppError(
+        HttpStatus.UNAUTHORIZED,
+        'OPERATOR_DICABUT',
+        'Akses pintu ini dicabut admin',
+      );
+    }
+    if (!op || op.expiresAt < new Date()) {
       throw unauthorized('Akses perangkat sudah dicabut atau habis');
     }
     req.operator = { id: op.id, sesiId: op.sesiId, label: op.label };

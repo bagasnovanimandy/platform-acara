@@ -67,7 +67,7 @@ type Body = Record<string, unknown> | FormData | undefined;
 
 async function raw(
   path: string,
-  init: { method?: string; body?: Body; base?: string } = {},
+  init: { method?: string; body?: Body; base?: string; signal?: AbortSignal } = {},
   retry = true,
 ): Promise<Response> {
   const token = useAuth.getState().accessToken;
@@ -84,6 +84,7 @@ async function raw(
     headers,
     body,
     credentials: 'include',
+    signal: init.signal,
   });
   if (res.status === 401 && retry && (await refreshSession())) return raw(path, init, false);
   if (!res.ok) throw await toError(res);
@@ -101,6 +102,11 @@ export async function api<T>(
 
 export async function apiBlob(path: string, base = CORE): Promise<Blob> {
   return (await raw(path, { base })).blob();
+}
+
+/** Respons mentah (mis. stream SSE) dengan token & refresh otomatis. */
+export function apiStream(path: string, base: string, signal: AbortSignal): Promise<Response> {
+  return raw(path, { base, signal });
 }
 
 /** Seperti `api`, tetapi ke acara-svc. */
