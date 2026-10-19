@@ -19,6 +19,7 @@ import {
 import type { AcaraDetail } from '@/lib/acara';
 import { acaraApi, errorMessage } from '@/lib/api';
 import { formatWaktu } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 interface Kehadiran {
   peserta: number;
@@ -31,6 +32,7 @@ interface Kehadiran {
     capturedAt: string;
     terlambat: boolean;
     perluTinjau: boolean;
+    wajahPending: boolean;
     pintu: string | null;
     anggota: { kode: string; nama: string; namaKelompok: string } | null;
     tamu: string | null;
@@ -117,7 +119,10 @@ export function KehadiranTab({ acara }: { acara: AcaraDetail }) {
                 </TableHeader>
                 <TableBody>
                   {[...k.items].reverse().map((i) => (
-                    <TableRow key={i.id}>
+                    <TableRow
+                      key={i.id}
+                      className={cn(i.wajahPending && 'bg-amber-50 dark:bg-amber-500/10')}
+                    >
                       <TableCell className="whitespace-nowrap tabular-nums">
                         {formatWaktu(i.capturedAt)}
                       </TableCell>
@@ -133,6 +138,11 @@ export function KehadiranTab({ acara }: { acara: AcaraDetail }) {
                         <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary">{METODE[i.metode]}</Badge>
                           {i.terlambat && <Badge variant="outline">Terlambat</Badge>}
+                          {i.wajahPending && (
+                            <Badge className="border-transparent bg-amber-400 text-black">
+                              Wajah belum diverifikasi
+                            </Badge>
+                          )}
                           {i.perluTinjau && <Badge variant="outline">Perlu ditinjau</Badge>}
                         </div>
                       </TableCell>

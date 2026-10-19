@@ -8,11 +8,13 @@ import { logout, refreshSession } from '@/lib/api';
 import { type AuthUser } from '@/lib/api';
 import { canAudit, canEdit, ROLE_LABEL, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { useJumlahWajahPending } from '@/lib/wajah';
 
 const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/acara', label: 'Acara' },
   { href: '/admin/anggota', label: 'Anggota' },
+  { href: '/admin/wajah', label: 'Wajah', show: canAudit },
   { href: '/admin/kategori', label: 'Kategori' },
   { href: '/admin/wilayah', label: 'Wilayah' },
   { href: '/admin/pengguna', label: 'Pengguna', show: canEdit },
@@ -23,6 +25,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const wajahPending = useJumlahWajahPending();
 
   useEffect(() => {
     if (status === 'unknown') void refreshSession();
@@ -52,6 +55,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 )}
               >
                 {n.label}
+                {n.href === '/admin/wajah' && !!wajahPending && (
+                  <span
+                    className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white tabular-nums"
+                    title={`${wajahPending} wajah perlu verifikasi`}
+                    data-testid="badge-wajah"
+                  >
+                    {wajahPending}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

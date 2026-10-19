@@ -261,7 +261,10 @@ export class OpService {
     if (item.metode === 'WAJAH') {
       faceDistance = item.faceDistance ?? null;
       if (item.faceDataId) {
-        const f = await this.prisma.faceData.findUnique({ where: { id: item.faceDataId } });
+        // Wajah yang baru didaftarkan di perangkat masih memakai clientId sebagai id.
+        const f = await this.prisma.faceData.findFirst({
+          where: { OR: [{ id: item.faceDataId }, { clientId: item.faceDataId }] },
+        });
         if (f && f.anggotaId === item.anggotaId && f.status !== 'REJECTED') faceDataId = f.id;
         else perluTinjau = true;
       }
@@ -342,6 +345,17 @@ export class OpService {
       where: { id: { in: absensi.flatMap((a) => (a.anggotaId ? [a.anggotaId] : [])) } },
       select: { id: true, kode: true, nama: true, namaKelompok: true },
     });
+    const wajahPending = new Set(
+      (
+        await this.prisma.faceData.findMany({
+          where: {
+            id: { in: absensi.flatMap((a) => (a.faceDataId ? [a.faceDataId] : [])) },
+            status: 'PENDING',
+          },
+          select: { id: true },
+        })
+      ).map((f) => f.id),
+    );
     const byId = new Map(anggota.map((a) => [a.id, a]));
     const tamuById = new Map(tamu.map((t) => [t.id, t]));
     const opById = new Map(operator.map((o) => [o.id, o.label]));
@@ -356,6 +370,7 @@ export class OpService {
         capturedAt: a.capturedAt,
         terlambat: a.terlambat,
         perluTinjau: a.perluTinjau,
+        wajahPending: a.faceDataId ? wajahPending.has(a.faceDataId) : false,
         pintu: a.operatorSessionId ? (opById.get(a.operatorSessionId) ?? null) : null,
         anggota: a.anggotaId ? (byId.get(a.anggotaId) ?? null) : null,
         tamu: a.tamuId ? (tamuById.get(a.tamuId)?.nama ?? null) : null,

@@ -83,3 +83,32 @@ export async function detectOne(
     score: r.detection.score,
   };
 }
+
+export type DeteksiPose = Omit<Detection, 'descriptor'>;
+
+/**
+ * Wajah terbesar + landmark tanpa embedding (lebih ringan), untuk panduan pose saat
+ * pendaftaran. Embedding dihitung hanya untuk frame yang diambil (`detectOne`).
+ */
+export async function detectPose(
+  input: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement,
+  opts: { inputSize?: number; scoreThreshold?: number } = {},
+): Promise<DeteksiPose | null> {
+  if (!api) throw new Error('Model belum dimuat');
+  const r = await api
+    .detectSingleFace(
+      input,
+      new api.TinyFaceDetectorOptions({
+        inputSize: opts.inputSize ?? FACE_DEFAULTS.inputSize,
+        scoreThreshold: opts.scoreThreshold ?? FACE_DEFAULTS.scoreThreshold,
+      }),
+    )
+    .withFaceLandmarks(true);
+  if (!r) return null;
+  const b = r.detection.box;
+  return {
+    box: { x: b.x, y: b.y, width: b.width, height: b.height },
+    landmarks: r.landmarks.positions.map((p) => ({ x: p.x, y: p.y })),
+    score: r.detection.score,
+  };
+}

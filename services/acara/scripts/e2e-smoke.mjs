@@ -714,6 +714,200 @@ check(
   JSON.stringify(daftar.pintu.map((p) => [p.label, p.status])),
 );
 
+// --- Pendaftaran wajah dari pintu & verifikasi admin
+{
+  const thumbB64 = (
+    await sharp({ create: { width: 160, height: 160, channels: 3, background: '#a87' } })
+      .webp()
+      .toBuffer()
+  ).toString('base64');
+  const vektor = (s) =>
+    Array.from({ length: 5 }, (_, i) =>
+      Array.from({ length: 128 }, (_, j) => Math.sin(s * 7 + i * 0.01 + j) * 0.1),
+    );
+  const enrollBody = (anggotaId, s) => ({
+    clientId: crypto.randomUUID(),
+    anggotaId,
+    descriptors: vektor(s),
+    thumbnails: Array(5).fill(`data:image/webp;base64,${thumbB64}`),
+    capturedAt: new Date().toISOString(),
+  });
+  const [wA, wB, wC] = paket.peserta.slice(0, 3);
+  const eA = enrollBody(wA.id, 1);
+  const en1 = await api('POST', '/op/face/enroll', { token: op2, body: eA });
+  check(
+    'pintu mendaftarkan wajah (5 embedding + 5 thumbnail) → PENDING',
+    en1.status === 200 && en1.json.status === 'PENDING' && en1.json.baru === true,
+    JSON.stringify(en1.json),
+  );
+  const en1b = await api('POST', '/op/face/enroll', { token: op2, body: eA });
+  check('kirim ulang pendaftaran tidak dobel', en1b.json.id === en1.json.id && !en1b.json.baru);
+  check(
+    'pendaftaran wajah tanpa token operator → 401',
+    (await api('POST', '/op/face/enroll', { token: sa, body: enrollBody(wA.id, 1) })).status ===
+      401,
+  );
+  check(
+    'pendaftaran wajah bukan peserta → 400',
+    (await api('POST', '/op/face/enroll', { token: op2, body: enrollBody('bukan-peserta', 1) }))
+      .json.code === 'BUKAN_PESERTA',
+  );
+  check(
+    'pendaftaran wajah dengan 4 pose → 400',
+    (
+      await api('POST', '/op/face/enroll', {
+        token: op2,
+        body: { ...enrollBody(wA.id, 1), descriptors: vektor(1).slice(0, 4) },
+      })
+    ).status === 400,
+  );
+  const en2 = await api('POST', '/op/face/enroll', { token: op2, body: enrollBody(wB.id, 2) });
+  const en3 = await api('POST', '/op/face/enroll', { token: op2, body: enrollBody(wC.id, 3) });
+  const pk2 = (await api('GET', '/op/paket', { token: opToken })).json;
+  check(
+    'wajah PENDING langsung ada di paket pintu lain',
+    [en1, en2, en3].every((e) =>
+      pk2.wajah.some(
+        (w) => w.id === e.json.id && w.status === 'PENDING' && w.descriptors.length === 5,
+      ),
+    ),
+  );
+  // Absensi WAJAH yang dibuat sebelum id server diketahui memakai clientId.
+  const sesiW = (
+    await api('POST', `/acara/${acara.id}/sesi`, {
+      token: adminSelatan,
+      body: { nama: 'Sesi Wajah', mulai: iso(mulai, 3), selesai: iso(mulai, 4) },
+    })
+  ).json.sesi.find((x) => x.nama === 'Sesi Wajah');
+  const genW = await api('POST', `/sesi/${sesiW.id}/operator/generate`, {
+    token: adminSelatan,
+    body: { jumlah: 1 },
+  });
+  const opW = (
+    await api('POST', '/op/login', { body: { token: genW.json.items[0].url.split('t=')[1] } })
+  ).json.token;
+  const absW = await api('POST', '/op/absensi/batch', {
+    token: opW,
+    body: {
+      items: [wA, wB].map((w, i) => ({
+        clientId: crypto.randomUUID(),
+        metode: 'WAJAH',
+        anggotaId: w.id,
+        faceDataId: i === 0 ? eA.clientId : en2.json.id,
+        faceDistance: 0.3,
+        capturedAt: new Date().toISOString(),
+      })),
+    },
+  });
+  let khW = (await api('GET', `/sesi/${sesiW.id}/kehadiran`, { token: adminSelatan })).json;
+  check(
+    'absensi dengan wajah PENDING ditandai (wajahPending) tanpa perluTinjau',
+    absW.json.ringkas?.baru === 2 &&
+      khW.items?.length === 2 &&
+      khW.items.every((i) => i.wajahPending && !i.perluTinjau),
+    JSON.stringify(khW.items ?? khW),
+  );
+  const pend = await api('GET', '/face/pending?pageSize=200', { token: adminSelatan });
+  const p1 = pend.json.items?.find((f) => f.id === en1.json.id);
+  check(
+    'admin desa melihat daftar wajah PENDING lengkap dengan pintu & sesi',
+    pend.status === 200 &&
+      p1?.anggota.id === wA.id &&
+      p1.jumlahThumbnail === 5 &&
+      p1.pintu === 'Pintu 2' &&
+      p1.sesi?.nama === sesi.nama,
+    JSON.stringify(p1 ?? pend.json),
+  );
+  const jml = (await api('GET', '/face/pending/jumlah', { token: adminSelatan })).json.jumlah;
+  check('jumlah wajah PENDING', jml >= 3);
+  const anggotaUtara = (await core('GET', `/anggota?desaId=${utara.id}&pageSize=1`, { token: sa }))
+    .json.items[0];
+  check(
+    'ganti ke anggota di luar wilayah admin → 403',
+    (
+      await api('POST', `/face/${en3.json.id}/reassign`, {
+        token: adminSelatan,
+        body: { anggotaId: anggotaUtara.id },
+      })
+    ).status === 403,
+  );
+  const th = await api('GET', `/face/${en1.json.id}/thumb/4`, { token: auditor });
+  check('thumbnail wajah WebP', th.status === 200 && th.type.startsWith('image/webp'));
+  check(
+    'auditor tidak bisa menyetujui wajah',
+    (await api('POST', `/face/${en1.json.id}/verify`, { token: auditor })).status === 403,
+  );
+  // SSE badge
+  {
+    const ctl = new AbortController();
+    const r = await fetch(`${B}/face/pending/stream`, {
+      headers: { authorization: `Bearer ${adminSelatan}` },
+      signal: ctl.signal,
+    });
+    const reader = r.body.getReader();
+    let buf = '';
+    while (!buf.includes('\n\n')) buf += new TextDecoder().decode((await reader.read()).value);
+    ctl.abort();
+    check(
+      'badge SSE jumlah wajah perlu verifikasi',
+      JSON.parse(buf.split('data:')[1]).jumlah === jml,
+      buf,
+    );
+  }
+  const v1 = await api('POST', `/face/${en1.json.id}/verify`, { token: adminSelatan });
+  check('setujui wajah → VERIFIED', v1.status === 200 && v1.json.status === 'VERIFIED');
+  check(
+    'wajah yang sudah diputus tidak bisa diputus lagi',
+    (await api('POST', `/face/${en1.json.id}/reject`, { token: adminSelatan, body: {} })).status ===
+      409,
+  );
+  const r2 = await api('POST', `/face/${en2.json.id}/reject`, {
+    token: adminSelatan,
+    body: { alasan: 'Bukan orangnya' },
+  });
+  check(
+    'tolak wajah → REJECTED, absensi yang memakainya ditandai perlu ditinjau',
+    r2.status === 200 && r2.json.status === 'REJECTED' && r2.json.absensiDitandai === 1,
+    JSON.stringify(r2.json),
+  );
+  const det2 = (await api('GET', `/face/${en2.json.id}`, { token: adminSelatan })).json;
+  check(
+    'wajah ditolak: thumbnail & embedding dihapus',
+    det2.status === 'REJECTED' &&
+      det2.jumlahThumbnail === 0 &&
+      (await api('GET', `/face/${en2.json.id}/thumb/0`, { token: adminSelatan })).status === 404,
+  );
+  const pk3 = (await api('GET', '/op/paket', { token: opToken })).json;
+  check(
+    'paket: wajah ditolak keluar, wajah disetujui jadi VERIFIED',
+    !pk3.wajah.some((w) => w.id === en2.json.id) &&
+      pk3.wajah.find((w) => w.id === en1.json.id)?.status === 'VERIFIED',
+  );
+  khW = (await api('GET', `/sesi/${sesiW.id}/kehadiran`, { token: adminSelatan })).json;
+  check(
+    'kehadiran: wajah disetujui tidak lagi kuning, wajah ditolak perlu ditinjau',
+    khW.items.find((i) => i.anggota.id === wA.id)?.wajahPending === false &&
+      khW.items.find((i) => i.anggota.id === wB.id)?.perluTinjau === true,
+  );
+  const g3 = await api('POST', `/face/${en3.json.id}/reassign`, {
+    token: adminSelatan,
+    body: { anggotaId: wA.id },
+  });
+  const det3 = (await api('GET', `/face/${en3.json.id}`, { token: adminSelatan })).json;
+  check(
+    'ganti anggota: wajah pindah ke anggota benar & VERIFIED, ada pembanding wajah sebelumnya',
+    g3.status === 200 &&
+      det3.anggota.id === wA.id &&
+      det3.status === 'VERIFIED' &&
+      det3.sebelumnya.some((s) => s.id === en1.json.id),
+    JSON.stringify(det3).slice(0, 300),
+  );
+  check(
+    'jumlah PENDING berkurang 3',
+    (await api('GET', '/face/pending/jumlah', { token: adminSelatan })).json.jumlah === jml - 3,
+  );
+}
+
 // --- Statistik dashboard
 const dSel = await api('GET', '/dashboard/acara', { token: adminSelatan });
 const dSa = (await api('GET', '/dashboard/acara', { token: sa })).json;

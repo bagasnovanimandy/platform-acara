@@ -1,4 +1,4 @@
-import type { AntreanItem, HasilBatch, OpSession, Paket } from './types';
+import type { AntreanItem, HasilBatch, HasilEnroll, OpSession, Paket, WajahLokal } from './types';
 
 const BASE = '/api/acara/op';
 
@@ -71,5 +71,19 @@ export function kirimBatch(s: OpSession, items: AntreanItem[]): Promise<HasilBat
     method: 'POST',
     token: s.token,
     body: JSON.stringify({ items }),
+  });
+}
+
+export function kirimWajah(s: OpSession, w: WajahLokal): Promise<HasilEnroll> {
+  return req('/face/enroll', {
+    method: 'POST',
+    token: s.token,
+    body: JSON.stringify({
+      clientId: w.clientId,
+      anggotaId: w.anggotaId,
+      descriptors: w.descriptors,
+      thumbnails: w.thumbnails,
+      capturedAt: w.capturedAt,
+    }),
   });
 }

@@ -1,9 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { alasanKeluar, ambilPaket, kirimBatch, kirimHeartbeat, OpError } from '@/lib/op/api';
+import {
+  alasanKeluar,
+  ambilPaket,
+  kirimBatch,
+  kirimHeartbeat,
+  kirimWajah,
+  OpError,
+} from '@/lib/op/api';
 import { db } from '@/lib/op/db';
-import type { AntreanItem, OpSession, Paket, PesertaPaket } from '@/lib/op/types';
+import type { AntreanItem, OpSession, Paket, PesertaPaket, WajahLokal } from '@/lib/op/types';
 
 const SYNC_MS = 5_000;
 const PAKET_MS = 120_000;
@@ -59,15 +66,18 @@ export function useOpData(
   const [sync, setSync] = useState<SyncState>('idle');
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [ditolak, setDitolak] = useState(0);
+  const [wajahLokal, setWajahLokal] = useState<WajahLokal[]>([]);
   const syncing = useRef(false);
 
   const refreshCounts = useCallback(async () => {
-    const [n, hadir, tolak] = await Promise.all([
+    const [n, hadir, tolak, wajah] = await Promise.all([
       db.antrean.where('sesiId').equals(sesiId).count(),
       db.hadir.where('sesiId').equals(sesiId).toArray(),
       db.ditolak.where('sesiId').equals(sesiId).count(),
+      db.wajah.where('sesiId').equals(sesiId).toArray(),
     ]);
-    setAntrean(n);
+    setWajahLokal(wajah);
+    setAntrean(n + wajah.filter((w) => !w.serverId).length);
     setHadirLokal(new Set(hadir.map((h) => h.anggotaId)));
     setDitolak(tolak);
   }, [sesiId]);
@@ -76,13 +86,20 @@ export function useOpData(
     try {
       const p = await ambilPaket(session);
       await db.paket.put({ sesiId, paket: p, disimpanAt: new Date().toISOString() });
+      // Wajah lokal yang terkirim sebelum paket ini dibuat sudah ada di paket (atau ditolak admin).
+      await db.wajah
+        .where('sesiId')
+        .equals(sesiId)
+        .filter((w) => !!w.terkirimAt && w.terkirimAt < p.dibuatAt)
+        .delete();
       setPaket(p);
       setPaketError(null);
+      await refreshCounts();
     } catch (e) {
       if (e instanceof OpError && e.status === 401) onExpired(alasanKeluar(e));
       else setPaketError(e instanceof Error ? e.message : 'Gagal mengunduh paket');
     }
-  }, [session, sesiId, onExpired]);
+  }, [session, sesiId, onExpired, refreshCounts]);
 
   // Paket dari IndexedDB dulu (offline), lalu perbarui dari server bila online.
   useEffect(() => {
@@ -106,11 +123,31 @@ export function useOpData(
 
   const kirim = useCallback(async () => {
     if (syncing.current || !navigator.onLine) return;
+    const wajah = await db.wajah
+      .where('sesiId')
+      .equals(sesiId)
+      .filter((w) => !w.serverId)
+      .toArray();
     const rows = await db.antrean.where('sesiId').equals(sesiId).sortBy('dibuatAt');
-    if (rows.length === 0) return;
+    if (rows.length === 0 && wajah.length === 0) return;
     syncing.current = true;
     setSync('mengirim');
     try {
+      // Wajah dulu, agar absensi yang memakainya dikenali server.
+      for (const w of wajah) {
+        try {
+          const res = await kirimWajah(session, w);
+          await db.wajah.update(w.clientId, {
+            serverId: res.id,
+            terkirimAt: new Date().toISOString(),
+            thumbnails: [],
+          });
+        } catch (e) {
+          // Data ditolak server (bukan peserta / tidak valid): buang, jangan dicoba terus.
+          if (e instanceof OpError && e.status === 400) await db.wajah.delete(w.clientId);
+          else throw e;
+        }
+      }
       for (let i = 0; i < rows.length; i += BATCH) {
         const part = rows.slice(i, i + BATCH);
         const res = await kirimBatch(
@@ -173,6 +210,16 @@ export function useOpData(
     [sesiId, refreshCounts, kirim],
   );
 
+  /** Simpan wajah baru: langsung dipakai pencocokan, dikirim saat ada jaringan. */
+  const daftarWajah = useCallback(
+    async (w: Omit<WajahLokal, 'sesiId' | 'serverId' | 'terkirimAt'>) => {
+      await db.wajah.put({ ...w, sesiId, serverId: null, terkirimAt: null });
+      await refreshCounts();
+      if (navigator.onLine) void kirim();
+    },
+    [sesiId, refreshCounts, kirim],
+  );
+
   // Heartbeat tiap 20 dtk untuk monitor admin (HANDOVER §5.7).
   const hbState = useRef({ antrean, sedangInput });
   hbState.current = { antrean, sedangInput };
@@ -213,7 +260,9 @@ export function useOpData(
     ditolak,
     sync,
     lastSync,
+    wajahLokal,
     catat,
+    daftarWajah,
     unduhPaket,
   };
 }

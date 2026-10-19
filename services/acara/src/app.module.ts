@@ -6,6 +6,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { CoreModule } from './core/core.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
+import { EventsModule } from './events/events.module.js';
+import { FaceModule } from './face/face.module.js';
 import { FotoModule } from './foto/foto.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OpModule } from './op/op.module.js';
@@ -25,6 +27,8 @@ import { SyncModule } from './sync/sync.module.js';
     FotoModule,
     DashboardModule,
     OpModule,
+    EventsModule,
+    FaceModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
