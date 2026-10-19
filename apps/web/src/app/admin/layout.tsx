@@ -10,6 +10,7 @@ import { canAudit, canEdit, ROLE_LABEL, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
 const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
+  { href: '/admin', label: 'Dashboard' },
   { href: '/admin/acara', label: 'Acara' },
   { href: '/admin/anggota', label: 'Anggota' },
   { href: '/admin/kategori', label: 'Kategori' },
@@ -46,7 +47,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 href={n.href}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm whitespace-nowrap hover:bg-accent',
-                  pathname.startsWith(n.href) && 'bg-accent font-medium',
+                  (n.href === '/admin' ? pathname === n.href : pathname.startsWith(n.href)) &&
+                    'bg-accent font-medium',
                 )}
               >
                 {n.label}

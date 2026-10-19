@@ -5,7 +5,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 ## Status fase
 - [x] 0. Fondasi
 - [x] 1. Core
-- [ ] 2. Acara — tahap A (kategori, auditor, riwayat, admin bertingkat) selesai; tahap B (layanan acara + halaman acara) selesai; dashboard admin & auditor di PR terpisah
+- [ ] 2. Acara — tahap A (kategori, auditor, riwayat, admin bertingkat) selesai; tahap B (layanan acara + halaman acara) dan dashboard admin & auditor selesai; statistik acara di dashboard menyusul
 - [ ] 3. Absensi offline
 - [ ] 4. Operator & monitoring
 - [ ] 5. Enrollment & verifikasi
@@ -21,6 +21,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - 2026-10-19 — 1 — Kategori generus jadi kolom manual `Anggota.kategori` (enum CABERAWIT/PRAREMAJA/REMAJA/USIA_NIKAH, boleh kosong), bukan dihitung dari umur; Setting batas usia dihapus dari seed. Ikut di DTO, filter `?kategori=` (termasuk `BELUM`), kolom import "Kategori" (opsional, dropdown di template), payload `anggota.upserted`, dan web (pilihan kategori di form, badge di tabel, filter, pratinjau import). Diverifikasi: unit test, `test:e2e` 37 skenario, uji browser 20 skenario.
 - 2026-10-19 — 2A — Permintaan pemilik: kategori jadi tabel `Kategori` (dikelola admin, 9 kategori awal) dan relasi banyak-ke-banyak `AnggotaKategori`; migrasi memindahkan isi kolom lama. Peran `AUDITOR` (lihat saja). `AuditLog` dicatat untuk perubahan anggota, wali, wilayah, kategori, dan pengguna, dengan wilayah untuk filter scope; `GET /audit` dan `GET /anggota/:id/riwayat`. Admin bertingkat: ADMIN mengelola pengguna di dalam wilayahnya. Web: halaman Kategori, detail anggota (profil, wali, riwayat pindah, riwayat perubahan), Pengguna, Riwayat; pilihan banyak kategori di form, tabel, filter, dan import (dipisah koma). Seed: contoh admin daerah, admin desa, auditor. Diverifikasi: 40 unit test core, `test:e2e` 51 skenario, uji browser 27 skenario.
 - 2026-10-19 — 2B — acara-svc: verifikasi JWT core lewat JWKS, scope dari `GET /internal/users/:id/scope`, salinan anggota `AnggotaRef` (event `anggota.upserted` + resync saat start, membawa `updatedAt`). Acara bertingkat KELOMPOK/DESA/DAERAH/GABUNGAN; peserta = wilayah × kategori (kode, kosong = semua) × jenis kelamin, dengan preview jumlah. Sesi, rundown (urutan bisa digeser), pengisi (anggota atau nama bebas), PJ, foto kegiatan (WebP maks 1600 px + thumbnail 320 px). Web: daftar & kalender acara, form dengan preview peserta langsung, detail (sesi & rundown, peserta, PJ, foto), cetak rundown, acara yang diikuti di profil anggota. Diverifikasi: `test:e2e` acara 45 skenario, uji browser 23 skenario.
+- 2026-10-19 — 2C — Dashboard di `/admin` (menu pertama, tujuan setelah login). Core: modul `dashboard`, `GET /dashboard/ringkasan` (ADMIN/PENGURUS/AUDITOR) dan `GET /dashboard/audit` (ADMIN/AUDITOR), agregasi di fungsi murni, sesuai scope wilayah. Web admin/pengurus: angka utama, gauge kelengkapan data, sebaran kategori, desa → kelompok (klik membuka daftar anggota terfilter), anggota baru per bulan, mutasi masuk/keluar, tempat kehadiran (menunggu fase 3); admin juga punya tab Aktivitas. Auditor: perubahan per hari, siapa mengubah, apa yang diubah, perubahan terbaru (tautan ke detail anggota), gauge kelengkapan. recharts + motion (muncul saat di-scroll, angka menghitung naik, menghormati reduced motion), tombol Tabel di tiap grafik. Daftar anggota membaca `?desaId=`/`?kelompokId=`. Diverifikasi: 50 unit test core (10 baru), `test:e2e` 55 skenario, uji browser 32 skenario (desktop & 390px).
 
 ## Keputusan
 <!-- keputusan baru yang tidak ada di HANDOVER, beserta alasannya -->
@@ -53,6 +54,8 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - Aturan peserta disimpan satu baris `PesertaRule` per wilayah dengan kategori & jenis kelamin yang sama; peserta dihitung saat dibaca dari `AnggotaRef` berstatus AKTIF (snapshot ke `PesertaSesi` saat sesi dibuka, fase 3).
 - Item rundown dihapus permanen (bukan data inti); acara, sesi, dan foto memakai `deletedAt`.
 - Foto dikecilkan di browser lalu dikonversi ulang di server dengan sharp; file di `UPLOAD_DIR/acara/<id>/`.
+- Dashboard: agregasi dihitung di core per request (data per scope kecil, belum perlu tabel ringkasan). Kelengkapan dihitung atas anggota AKTIF; kontak dianggap terisi bila anggota punya No WA atau wali. Mutasi dibagi masuk/keluar/di dalam relatif terhadap scope pengguna; hari & bulan dikelompokkan dalam WIB.
+- Grafik memakai recharts, gerak memakai `motion` (ringan, tanpa dependensi native). Gauge SVG sendiri (`role="meter"`). Warna seri dari palet dataviz (`--chart-*` di globals.css); batang kategori memakai warna kategorinya.
 
 ## Tertunda / masalah
 - Skema wabot belum punya migrasi (fase 7). Model acara untuk fase 3–6 (operator, absensi, wajah, rekap) sudah ikut migrasi awal acara dan bisa berubah.

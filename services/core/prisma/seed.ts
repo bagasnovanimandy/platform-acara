@@ -121,6 +121,8 @@ async function main(): Promise<void> {
             },
             noWa: tahun <= 2008 ? `62812${String(10000000 + n).padStart(8, '0')}` : null,
             kelompokId: kelompok.id,
+            // Tersebar dalam 12 bulan terakhir agar grafik pertumbuhan di dashboard terisi.
+            createdAt: new Date(Date.now() - ((n * 7) % 12) * 30 * 86_400_000),
           },
           update: {},
         });
