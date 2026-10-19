@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { KategoriBadge } from '@/components/kategori-badge';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,8 @@ import { api, apiBlob, errorMessage } from '@/lib/api';
 import { formatTanggal } from '@/lib/queries';
 import type { ImportResult } from '@/lib/types';
 
-const COLUMNS = 'Nama, JK, Tgl Lahir, No WA, No WA Ortu, Nama Ortu, Kelompok, Desa, Daerah';
+const COLUMNS =
+  'Nama, JK, Tgl Lahir, Kategori, No WA, No WA Ortu, Nama Ortu, Kelompok, Desa, Daerah';
 
 export default function ImportPage() {
   const qc = useQueryClient();
@@ -68,7 +70,8 @@ export default function ImportPage() {
           <CardTitle>1. Siapkan file</CardTitle>
           <CardDescription>
             Baris pertama berisi judul kolom: {COLUMNS}. Nama wilayah harus sama dengan data wilayah
-            (huruf besar/kecil tidak masalah). Tanggal lahir pakai format dd/mm/yyyy.
+            (huruf besar/kecil tidak masalah). Tanggal lahir pakai format dd/mm/yyyy. Kategori boleh
+            dikosongkan bila belum di-assessment.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -180,6 +183,7 @@ export default function ImportPage() {
                       <TableRow>
                         <TableHead>Baris</TableHead>
                         <TableHead>Nama</TableHead>
+                        <TableHead>Kategori</TableHead>
                         <TableHead>JK</TableHead>
                         <TableHead>Tgl lahir</TableHead>
                         <TableHead>No WA</TableHead>
@@ -192,6 +196,9 @@ export default function ImportPage() {
                         <TableRow key={p.baris}>
                           <TableCell>{p.baris}</TableCell>
                           <TableCell className="font-medium">{p.nama}</TableCell>
+                          <TableCell>
+                            <KategoriBadge kategori={p.kategori} />
+                          </TableCell>
                           <TableCell>{p.jenisKelamin}</TableCell>
                           <TableCell>{formatTanggal(p.tanggalLahir)}</TableCell>
                           <TableCell>{p.noWa ?? '–'}</TableCell>

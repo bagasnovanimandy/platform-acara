@@ -123,6 +123,7 @@ const created = await api('POST', '/anggota', {
     nama: 'Uji Coba',
     jenisKelamin: 'L',
     tanggalLahir: '2011-01-02',
+    kategori: 'REMAJA',
     noWa: `0857 ${String(Date.now()).slice(-8)}`,
     kelompokId: kelMelati.id,
   },
@@ -131,7 +132,8 @@ check(
   'buat anggota + kode otomatis',
   created.status === 201 &&
     /^JS-\d{4}$/.test(created.json.kode) &&
-    created.json.noWa.startsWith('62857'),
+    created.json.noWa.startsWith('62857') &&
+    created.json.kategori === 'REMAJA',
   JSON.stringify(created.json),
 );
 check(
@@ -171,6 +173,33 @@ check(
   'PATCH status NONAKTIF',
   (await api('PATCH', `/anggota/${created.json.id}`, { token: ad, body: { status: 'NONAKTIF' } }))
     .json.status === 'NONAKTIF',
+);
+const badKategori = await api('PATCH', `/anggota/${created.json.id}`, {
+  token: ad,
+  body: { kategori: 'DEWASA' },
+});
+check('kategori tidak dikenal → VALIDATION_ERROR', badKategori.json.code === 'VALIDATION_ERROR');
+check(
+  'kategori diubah manual, bukan dari umur',
+  (
+    await api('PATCH', `/anggota/${created.json.id}`, {
+      token: ad,
+      body: { kategori: 'USIA_NIKAH' },
+    })
+  ).json.kategori === 'USIA_NIKAH',
+);
+const byKategori = (await api('GET', '/anggota?pageSize=200&kategori=USIA_NIKAH', { token: ad }))
+  .json;
+check(
+  'filter kategori',
+  byKategori.items.some((a) => a.id === created.json.id) &&
+    byKategori.items.every((a) => a.kategori === 'USIA_NIKAH'),
+);
+const belum = (await api('GET', '/anggota?pageSize=200&kategori=BELUM', { token: sa })).json;
+check(
+  'filter kategori belum diisi',
+  belum.total > 0 && belum.items.every((a) => a.kategori === null),
+  `${belum.total}`,
 );
 
 const wali = await api('POST', '/wali', {
@@ -222,6 +251,7 @@ ws.addRow([
   'Nama',
   'JK',
   'Tgl Lahir',
+  'Kategori',
   'No WA',
   'No WA Ortu',
   'Nama Ortu',
@@ -235,6 +265,7 @@ for (let i = 0; i < 100; i++) {
     `Import ${stamp} ${i}`,
     i % 2 ? 'P' : 'L',
     `${(i % 28) + 1}/0${(i % 9) + 1}/2012`,
+    ['', 'Caberawit', 'pra remaja', 'Remaja', 'Usia Nikah'][i % 5],
     i % 3 === 0 ? `0877${stamp}${String(i).padStart(3, '0')}` : '',
     i % 3 === 1 ? `0878${stamp}${String(i).padStart(3, '0')}` : '',
     'Ortu',
@@ -243,10 +274,11 @@ for (let i = 0; i < 100; i++) {
     'Daerah Contoh',
   ]);
 }
-ws.addRow(['', 'L', '', '', '', '', 'Kelompok Melati', 'Desa Selatan', 'Daerah Contoh']);
+ws.addRow(['', 'L', '', '', '', '', '', 'Kelompok Melati', 'Desa Selatan', 'Daerah Contoh']);
 ws.addRow([
   'Salah Wilayah',
   'L',
+  '',
   '',
   '',
   '',
@@ -259,6 +291,19 @@ ws.addRow([
   'Salah Tanggal',
   'P',
   '30/02/2012',
+  '',
+  '',
+  '',
+  '',
+  'Kelompok Melati',
+  'Desa Selatan',
+  'Daerah Contoh',
+]);
+ws.addRow([
+  'Salah Kategori',
+  'P',
+  '',
+  'Dewasa',
   '',
   '',
   '',
@@ -275,8 +320,8 @@ const form = () => {
 const before = (await api('GET', '/anggota?pageSize=1', { token: sa })).json.total;
 const dry = await api('POST', '/anggota/import?dryRun=true', { token: ad, form: form() });
 check(
-  'import dry-run: 100 valid, 3 gagal',
-  dry.json.valid === 100 && dry.json.gagal === 3 && dry.json.dibuat === 0,
+  'import dry-run: 100 valid, 4 gagal',
+  dry.json.valid === 100 && dry.json.gagal === 4 && dry.json.dibuat === 0,
   JSON.stringify(dry.json).slice(0, 300),
 );
 check(
@@ -295,6 +340,11 @@ const after = (await api('GET', `/anggota?pageSize=200&q=Import ${stamp}`, { tok
 check(
   '100 anggota import terlihat di desa',
   after.total === 100 && new Set(after.items.map((a) => a.kode)).size === 100,
+);
+check(
+  'kolom Kategori ikut diimpor (kosong = belum diisi)',
+  after.items.filter((a) => a.kategori === 'PRAREMAJA').length === 20 &&
+    after.items.filter((a) => a.kategori === null).length === 20,
 );
 const again = await api('POST', '/anggota/import?dryRun=true', { token: ad, form: form() });
 check(
@@ -323,7 +373,9 @@ const internal = await fetch(`${B}/internal/anggota?ids=${created.json.id}`, {
 }).then((r) => r.json());
 check(
   'internal anggota memakai format event',
-  internal[0]?.namaDesa === 'Desa Utara' && internal[0]?.waliNoWa.length === 1,
+  internal[0]?.namaDesa === 'Desa Utara' &&
+    internal[0]?.waliNoWa.length === 1 &&
+    internal[0]?.kategori === 'USIA_NIKAH',
   JSON.stringify(internal),
 );
 console.log(`\n${pass} lulus, ${fail} gagal`);

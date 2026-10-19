@@ -1,8 +1,10 @@
 'use client';
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { KATEGORI_GENERUS, KATEGORI_GENERUS_LABEL } from '@platform-acara/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { KategoriBadge } from '@/components/kategori-badge';
 import { EMPTY_WILAYAH, WilayahSelect, type WilayahValue } from '@/components/wilayah-select';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +45,7 @@ export default function AnggotaPage() {
   const [wilayah, setWilayah] = useState<WilayahValue>(EMPTY_WILAYAH);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [kategori, setKategori] = useState('');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Anggota | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -52,6 +55,7 @@ export default function AnggotaPage() {
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (search) params.set('q', search);
   if (status) params.set('status', status);
+  if (kategori) params.set('kategori', kategori);
   if (wilayah.kelompokId) params.set('kelompokId', wilayah.kelompokId);
   else if (wilayah.desaId) params.set('desaId', wilayah.desaId);
   else if (wilayah.daerahId) params.set('daerahId', wilayah.daerahId);
@@ -85,7 +89,7 @@ export default function AnggotaPage() {
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div className="flex flex-col gap-2">
           <Label htmlFor="q">Cari</Label>
           <Input
@@ -106,6 +110,25 @@ export default function AnggotaPage() {
             setPage(1);
           }}
         />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="kategori-filter">Kategori</Label>
+          <NativeSelect
+            id="kategori-filter"
+            value={kategori}
+            onChange={(e) => {
+              setKategori(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Semua</option>
+            {KATEGORI_GENERUS.map((k) => (
+              <option key={k} value={k}>
+                {KATEGORI_GENERUS_LABEL[k]}
+              </option>
+            ))}
+            <option value="BELUM">Belum diisi</option>
+          </NativeSelect>
+        </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="status-filter">Status</Label>
           <NativeSelect
@@ -132,6 +155,7 @@ export default function AnggotaPage() {
             <TableRow>
               <TableHead>Kode</TableHead>
               <TableHead>Nama</TableHead>
+              <TableHead>Kategori</TableHead>
               <TableHead>JK</TableHead>
               <TableHead>Tgl lahir</TableHead>
               <TableHead>No WA</TableHead>
@@ -145,6 +169,9 @@ export default function AnggotaPage() {
               <TableRow key={a.id}>
                 <TableCell className="font-mono text-xs">{a.kode}</TableCell>
                 <TableCell className="font-medium">{a.nama}</TableCell>
+                <TableCell>
+                  <KategoriBadge kategori={a.kategori} />
+                </TableCell>
                 <TableCell>{a.jenisKelamin}</TableCell>
                 <TableCell>{formatTanggal(a.tanggalLahir)}</TableCell>
                 <TableCell>{a.noWa ?? '–'}</TableCell>
@@ -175,7 +202,7 @@ export default function AnggotaPage() {
             ))}
             {list.data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                   Tidak ada anggota
                 </TableCell>
               </TableRow>

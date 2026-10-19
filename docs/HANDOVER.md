@@ -121,7 +121,7 @@ Draft lengkap ada di `services/*/prisma/schema.prisma`.
 - **Daerah** → **Desa** → **Kelompok** (bertingkat, bukan teks bebas).
 - **Anggota**: `kode` (mis. `JS-0001`), `nama`, `jenisKelamin`, `tanggalLahir`, `noWa?` (format `62…`), `kelompokId`, `status` (AKTIF/PINDAH/NONAKTIF), `fotoUrl?`.
   - **Alamat sambung = Kelompok–Desa–Daerah**, diturunkan dari `kelompokId`. Tidak ada field alamat sambung terpisah, tidak ada alamat rumah.
-  - Kategori usia (caberawit/praremaja/remaja/usia nikah) **dihitung** dari tanggal lahir, tidak disimpan. Batas usia dikonfigurasi di tabel `Setting`.
+  - Kategori generus (caberawit/praremaja/remaja/usia nikah) **diisi manual** per anggota (`kategori`, boleh kosong = belum ditentukan) berdasarkan assessment tersendiri. **Tidak** dihitung dari umur/tanggal lahir. *(Diubah 2026-10-19 atas permintaan pemilik.)*
 - **Wali** (`noWa` unik) ↔ **AnggotaWali** (satu wali bisa punya banyak anak).
 - **MutasiSambung**: riwayat pindah kelompok.
 - **User** (admin/pengurus) + **UserScope** (wilayah).
@@ -130,7 +130,7 @@ Draft lengkap ada di `services/*/prisma/schema.prisma`.
 - **AnggotaRef**: salinan ringkas anggota dari core.
 - **Acara** → **Sesi** → **RundownItem** (+ **Pengisi** per item).
 - **AcaraPJ**: penanggung jawab acara (peran: PJ_UMUM, PJ_IZIN, dll).
-- **PesertaRule**: aturan peserta target (filter wilayah, jenis kelamin, kategori usia). Hasilnya di-*snapshot* ke **PesertaSesi** saat sesi dibuka, supaya rekap tidak berubah walau data anggota berubah.
+- **PesertaRule**: aturan peserta target (filter wilayah, jenis kelamin, kategori generus). Hasilnya di-*snapshot* ke **PesertaSesi** saat sesi dibuka, supaya rekap tidak berubah walau data anggota berubah.
 - **FotoKegiatan**.
 - **OperatorSession**: operator sementara per sesi (label pintu, PIN hash, token, `expiresAt`, `revokedAt`, `lastSeenAt`, `lastScanAt`, info perangkat).
 - **Absensi**: unik `(sesiId, anggotaId)`; `metode` (WAJAH/MANUAL/TAMU), `operatorSessionId`, `capturedAt` (waktu di perangkat), `syncedAt`, `clientId` (UUID dari perangkat, idempoten), `faceDistance?`.
@@ -338,7 +338,6 @@ Kerjakan **berurutan**. Fase 3 boleh dimulai paralel dengan fase 2 karena packag
 - WA via Baileys, menu teks bernomor.
 
 ## 11. Pertanyaan terbuka
-- Batas usia tiap kategori generus (diisi di Setting).
 - Apakah satu acara bisa lintas desa/daerah dengan admin berbeda? (Asumsi awal: ya, via PesertaRule + scope penyelenggara.)
 - Siapa default PJ_IZIN bila acara tidak menetapkan.
 - Format kode anggota (asumsi: `<kode desa>-<nomor urut 4 digit>`).

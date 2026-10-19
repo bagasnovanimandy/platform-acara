@@ -31,6 +31,7 @@ const base: RawRow = {
   Nama: 'Ahmad Fauzi',
   JK: 'L',
   'Tgl Lahir': '05/03/2010',
+  Kategori: 'Pra Remaja',
   'No WA': '0812 3456 7890',
   'No WA Ortu': '+62 813-0000-1111',
   'Nama Ortu': 'Pak Budi',
@@ -48,6 +49,7 @@ describe('validateImportRows', () => {
       nama: 'Ahmad Fauzi',
       jenisKelamin: 'L',
       tanggalLahir: '2010-03-05',
+      kategori: 'PRAREMAJA',
       noWa: '6281234567890',
       noWaOrtu: '6281300001111',
       namaOrtu: 'Pak Budi',
@@ -57,7 +59,17 @@ describe('validateImportRows', () => {
 
   it('melaporkan semua kesalahan per baris dengan nomor baris Excel', () => {
     const { valid, errors } = validateImportRows(
-      [base, { ...base, Nama: '', JK: 'X', 'Tgl Lahir': '31/02/2010', 'No WA': '12345' }],
+      [
+        base,
+        {
+          ...base,
+          Nama: '',
+          JK: 'X',
+          'Tgl Lahir': '31/02/2010',
+          Kategori: 'Dewasa',
+          'No WA': '12345',
+        },
+      ],
       ctx,
     );
     expect(valid).toHaveLength(1);
@@ -69,6 +81,7 @@ describe('validateImportRows', () => {
           'Nama wajib diisi',
           'JK harus L atau P',
           'Tgl Lahir tidak valid (pakai dd/mm/yyyy)',
+          'Kategori harus Caberawit, Pra-remaja, Remaja, atau Usia nikah',
           'No WA tidak valid',
         ],
       },
@@ -115,6 +128,7 @@ describe('validateImportRows', () => {
     expect(valid[0]).toMatchObject({
       jenisKelamin: 'P',
       tanggalLahir: null,
+      kategori: null,
       noWa: null,
       noWaOrtu: null,
     });

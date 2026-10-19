@@ -1,3 +1,4 @@
+import { KATEGORI_GENERUS, KATEGORI_GENERUS_LABEL } from '@platform-acara/shared';
 import ExcelJS from 'exceljs';
 import { badRequest } from '../common/app-error.js';
 import {
@@ -73,6 +74,7 @@ export async function importTemplateXlsx(): Promise<Buffer> {
     'Ahmad Fauzi',
     'L',
     '05/03/2010',
+    'Pra-remaja',
     '081234567890',
     '081300001111',
     'Budi Santoso',
@@ -83,6 +85,18 @@ export async function importTemplateXlsx(): Promise<Buffer> {
   ws.getRow(1).font = { bold: true };
   ws.columns.forEach((c) => (c.width = 18));
   // Simpan tanggal & nomor sebagai teks agar Excel tidak mengubah 08… menjadi angka.
-  for (const col of [3, 4, 5]) ws.getColumn(col).numFmt = '@';
+  for (const col of ['Tgl Lahir', 'No WA', 'No WA Ortu'] as const) {
+    ws.getColumn(IMPORT_COLUMNS.indexOf(col) + 1).numFmt = '@';
+  }
+  // Pilihan kategori sebagai dropdown; boleh dikosongkan bila belum di-assessment.
+  const kategoriCol = IMPORT_COLUMNS.indexOf('Kategori') + 1;
+  const pilihan = KATEGORI_GENERUS.map((k) => KATEGORI_GENERUS_LABEL[k]).join(',');
+  for (let r = 2; r <= 1000; r++) {
+    ws.getRow(r).getCell(kategoriCol).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`"${pilihan}"`],
+    };
+  }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

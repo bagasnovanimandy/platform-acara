@@ -23,6 +23,8 @@ export interface Daerah {
   desa: Desa[];
 }
 
+import type { KategoriGenerus } from '@platform-acara/shared';
+
 export type StatusAnggota = 'AKTIF' | 'PINDAH' | 'NONAKTIF';
 
 export interface Anggota {
@@ -31,6 +33,7 @@ export interface Anggota {
   nama: string;
   jenisKelamin: 'L' | 'P';
   tanggalLahir: string | null;
+  kategori: KategoriGenerus | null;
   noWa: string | null;
   status: StatusAnggota;
   kelompokId: string;
@@ -60,6 +63,7 @@ export interface ImportResult {
     nama: string;
     jenisKelamin: 'L' | 'P';
     tanggalLahir: string | null;
+    kategori: KategoriGenerus | null;
     noWa: string | null;
     noWaOrtu: string | null;
     namaOrtu: string | null;

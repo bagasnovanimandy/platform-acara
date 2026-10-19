@@ -17,6 +17,7 @@ export function toAnggotaUpserted(a: AnggotaWithWilayah): EventPayload<'anggota.
     nama: a.nama,
     jk: a.jenisKelamin,
     tglLahir: toIsoDate(a.tanggalLahir),
+    kategori: a.kategori,
     kelompokId: a.kelompokId,
     desaId: a.kelompok.desaId,
     daerahId: a.kelompok.desa.daerahId,

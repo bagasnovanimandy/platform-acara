@@ -23,6 +23,14 @@ enum JenisKelamin {
   P
 }
 
+/// Diisi manual per anggota dari assessment tersendiri, bukan dihitung dari umur.
+enum KategoriGenerus {
+  CABERAWIT
+  PRAREMAJA
+  REMAJA
+  USIA_NIKAH
+}
+
 enum StatusAnggota {
   AKTIF
   PINDAH
@@ -86,6 +94,7 @@ model Anggota {
   nama         String
   jenisKelamin JenisKelamin
   tanggalLahir DateTime?       @db.Date
+  kategori     KategoriGenerus? // null = belum di-assessment
   noWa         String?         @unique // format 62xxxx
   kelompokId   String
   kelompok     Kelompok        @relation(fields: [kelompokId], references: [id])
@@ -97,6 +106,7 @@ model Anggota {
   updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
 
   @@index([kelompokId])
+  @@index([kategori])
   @@index([nama])
 }
 
@@ -161,7 +171,7 @@ model UserScope {
 }
 
 model Setting {
-  key       String   @id // mis. "usia.caberawit.max"
+  key       String   @id // konfigurasi umum (key → JSON)
   value     Json
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }

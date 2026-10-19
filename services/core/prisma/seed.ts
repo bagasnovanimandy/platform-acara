@@ -1,11 +1,11 @@
 /**
- * Data awal dev: 1 SUPER_ADMIN, 1 daerah, 2 desa, 4 kelompok, 40 anggota dummy, setting usia.
+ * Data awal dev: 1 SUPER_ADMIN, 1 daerah, 2 desa, 4 kelompok, 40 anggota dummy.
  * Idempoten: aman dijalankan berulang (`pnpm --filter @platform-acara/core db:seed`).
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
-import { PrismaClient } from '../src/generated/prisma/client.js';
+import { type KategoriGenerus, PrismaClient } from '../src/generated/prisma/client.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -13,14 +13,6 @@ const prisma = new PrismaClient({
 
 const ADMIN_EMAIL = (process.env.SEED_ADMIN_EMAIL ?? 'admin@platform-acara.local').toLowerCase();
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
-
-/** Batas usia kategori generus (tahun, inklusif). Asumsi awal; ubah lewat tabel Setting. */
-const SETTINGS: Record<string, unknown> = {
-  'usia.caberawit.max': 12,
-  'usia.praremaja.max': 15,
-  'usia.remaja.max': 18,
-  'usia.usia_nikah.min': 19,
-};
 
 const WILAYAH = {
   daerah: { kode: 'DC', nama: 'Daerah Contoh' },
@@ -65,6 +57,16 @@ const NAMA_B = [
   'Kurnia',
 ];
 
+/** Contoh hasil assessment; sebagian sengaja kosong (belum di-assessment). */
+const KATEGORI_DUMMY: (KategoriGenerus | null)[] = [
+  'CABERAWIT',
+  'PRAREMAJA',
+  'REMAJA',
+  'USIA_NIKAH',
+  'REMAJA',
+  null,
+];
+
 async function main(): Promise<void> {
   const admin = await prisma.user.upsert({
     where: { email: ADMIN_EMAIL },
@@ -76,14 +78,6 @@ async function main(): Promise<void> {
     },
     update: {},
   });
-
-  for (const [key, value] of Object.entries(SETTINGS)) {
-    await prisma.setting.upsert({
-      where: { key },
-      create: { key, value: value as never },
-      update: {},
-    });
-  }
 
   const daerah = await prisma.daerah.upsert({
     where: { kode: WILAYAH.daerah.kode },
@@ -118,6 +112,7 @@ async function main(): Promise<void> {
             nama,
             jenisKelamin: jk,
             tanggalLahir: new Date(Date.UTC(tahun, n % 12, (n % 27) + 1)),
+            kategori: KATEGORI_DUMMY[n % KATEGORI_DUMMY.length],
             noWa: tahun <= 2008 ? `62812${String(10000000 + n).padStart(8, '0')}` : null,
             kelompokId: kelompok.id,
           },

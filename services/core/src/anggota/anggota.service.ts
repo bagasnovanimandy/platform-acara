@@ -66,6 +66,7 @@ export class AnggotaService {
     if (q.daerahId) and.push({ kelompok: { desa: { daerahId: q.daerahId } } });
     if (q.status) and.push({ status: q.status });
     if (q.jenisKelamin) and.push({ jenisKelamin: q.jenisKelamin });
+    if (q.kategori) and.push({ kategori: q.kategori === 'BELUM' ? null : q.kategori });
     if (q.q) {
       and.push({
         OR: [
@@ -113,6 +114,7 @@ export class AnggotaService {
           nama: dto.nama,
           jenisKelamin: dto.jenisKelamin,
           tanggalLahir: dto.tanggalLahir ? fromIsoDate(dto.tanggalLahir) : null,
+          kategori: dto.kategori ?? null,
           noWa: dto.noWa,
           status: dto.status,
           fotoUrl: dto.fotoUrl,
@@ -214,6 +216,7 @@ export class AnggotaService {
               nama: row.nama,
               jenisKelamin: row.jenisKelamin,
               tanggalLahir: row.tanggalLahir ? fromIsoDate(row.tanggalLahir) : null,
+              kategori: row.kategori,
               noWa: row.noWa,
               kelompokId: row.wilayah.kelompokId,
             },

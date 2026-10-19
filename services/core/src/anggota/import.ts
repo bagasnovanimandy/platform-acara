@@ -1,10 +1,11 @@
-import { normalizeWa } from '@platform-acara/shared';
+import { type KategoriGenerus, normalizeWa, parseKategori } from '@platform-acara/shared';
 
 /** Kolom file import (header baris pertama, tidak peka huruf besar/kecil). */
 export const IMPORT_COLUMNS = [
   'Nama',
   'JK',
   'Tgl Lahir',
+  'Kategori',
   'No WA',
   'No WA Ortu',
   'Nama Ortu',
@@ -31,6 +32,7 @@ export interface ValidRow {
   nama: string;
   jenisKelamin: 'L' | 'P';
   tanggalLahir: string | null;
+  kategori: KategoriGenerus | null;
   noWa: string | null;
   noWaOrtu: string | null;
   namaOrtu: string | null;
@@ -125,6 +127,13 @@ export function validateImportRows(
     const tgl = parseTanggal(row['Tgl Lahir']);
     if (tgl === 'invalid') pesan.push('Tgl Lahir tidak valid (pakai dd/mm/yyyy)');
 
+    // Kategori opsional: boleh dikosongkan lalu diisi setelah assessment.
+    let kategori: KategoriGenerus | null = null;
+    if (text(row.Kategori)) {
+      kategori = parseKategori(text(row.Kategori));
+      if (!kategori) pesan.push('Kategori harus Caberawit, Pra-remaja, Remaja, atau Usia nikah');
+    }
+
     let noWa: string | null = null;
     if (text(row['No WA'])) {
       noWa = normalizeWa(text(row['No WA']));
@@ -162,6 +171,7 @@ export function validateImportRows(
       nama,
       jenisKelamin: jk,
       tanggalLahir: tgl,
+      kategori,
       noWa,
       noWaOrtu,
       namaOrtu,

@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
+import { KategoriPicker } from '@/components/kategori-picker';
 import { EMPTY_WILAYAH, WilayahSelect, type WilayahValue } from '@/components/wilayah-select';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ export function AnggotaFormDialog({
       nama: f.get('nama'),
       jenisKelamin: f.get('jenisKelamin'),
       tanggalLahir: f.get('tanggalLahir') || null,
+      kategori: f.get('kategori') || null,
       noWa: f.get('noWa') || null,
       status: f.get('status'),
     };
@@ -99,6 +101,7 @@ export function AnggotaFormDialog({
               />
             </div>
           </div>
+          <KategoriPicker name="kategori" defaultValue={anggota?.kategori ?? null} />
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="noWa">No WA</Label>
