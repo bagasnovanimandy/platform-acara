@@ -2,6 +2,7 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "globalEnv": ["NODE_ENV"],
+  "globalPassThroughEnv": ["DATABASE_URL", "REDIS_URL", "PORT"],
   "tasks": {
     "db:generate": {
       "cache": false
