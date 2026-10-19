@@ -6,7 +6,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - [x] 0. Fondasi
 - [x] 1. Core
 - [x] 2. Acara (tahap A kategori/auditor/admin bertingkat, tahap B acara, dashboard admin & auditor, statistik acara)
-- [ ] 3. Absensi offline
+- [x] 3. Absensi offline (perangkat pintu sementara lewat tautan uji; QR/PIN di fase 4)
 - [ ] 4. Operator & monitoring
 - [ ] 5. Enrollment & verifikasi
 - [ ] 6. Rekap
@@ -23,6 +23,7 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - 2026-10-19 — 2B — acara-svc: verifikasi JWT core lewat JWKS, scope dari `GET /internal/users/:id/scope`, salinan anggota `AnggotaRef` (event `anggota.upserted` + resync saat start, membawa `updatedAt`). Acara bertingkat KELOMPOK/DESA/DAERAH/GABUNGAN; peserta = wilayah × kategori (kode, kosong = semua) × jenis kelamin, dengan preview jumlah. Sesi, rundown (urutan bisa digeser), pengisi (anggota atau nama bebas), PJ, foto kegiatan (WebP maks 1600 px + thumbnail 320 px). Web: daftar & kalender acara, form dengan preview peserta langsung, detail (sesi & rundown, peserta, PJ, foto), cetak rundown, acara yang diikuti di profil anggota. Diverifikasi: `test:e2e` acara 45 skenario, uji browser 23 skenario.
 - 2026-10-19 — 2C — Dashboard di `/admin` (menu pertama, tujuan setelah login). Core: modul `dashboard`, `GET /dashboard/ringkasan` (ADMIN/PENGURUS/AUDITOR) dan `GET /dashboard/audit` (ADMIN/AUDITOR), agregasi di fungsi murni, sesuai scope wilayah. Web admin/pengurus: angka utama, gauge kelengkapan data, sebaran kategori, desa → kelompok (klik membuka daftar anggota terfilter), anggota baru per bulan, mutasi masuk/keluar, tempat kehadiran (menunggu fase 3); admin juga punya tab Aktivitas. Auditor: perubahan per hari, siapa mengubah, apa yang diubah, perubahan terbaru (tautan ke detail anggota), gauge kelengkapan. recharts + motion (muncul saat di-scroll, angka menghitung naik, menghormati reduced motion), tombol Tabel di tiap grafik. Daftar anggota membaca `?desaId=`/`?kelompokId=`. Diverifikasi: 50 unit test core (10 baru), `test:e2e` 55 skenario, uji browser 32 skenario (desktop & 390px).
 - 2026-10-19 — 2D — Statistik acara di dashboard: acara-svc `GET /dashboard/acara` (ADMIN/PENGURUS/AUDITOR, sesuai visibilitas acara): acara bulan ini, akan datang, total acara & sesi, acara per bulan (6 lalu–5 ke depan, WIB, tanpa BATAL), 5 acara terdekat. Web: bagian "Acara" di dashboard admin/pengurus. Diverifikasi: 3 unit test baru, `test:e2e` acara 47 skenario, cek browser.
+- 2026-10-19 — 3 — `packages/face`: muat model (WebGL, cadangan CPU), deteksi + landmark + descriptor, estimasi pose, pencocok Euclidean (ambang 0,5), skor blur; 7 unit test. acara-svc: token operator HS256 (`OPERATOR_JWT_SECRET`, kedaluwarsa = selesai sesi + 2 jam), `POST /op/login` (token sekali pakai), `GET /op/paket` (peserta id/kode/nama/kelompok + embedding VERIFIED/PENDING + yang sudah hadir, tanpa data pribadi), `POST /op/absensi/batch` (idempoten per `clientId`, simpan waktu paling awal, scan berikutnya ke `AbsensiDuplikat`, terlambat & perlu tinjau), `POST /op/tamu`, `GET /sesi/:id/kehadiran`, `POST /sesi/:id/operator/uji` (sementara sampai fase 4). Web: PWA `/op` (Serwist; app shell + model wajah di-cache, antrean Dexie, kirim tiap 5 dtk), kamera dengan pilihan perangkat, scan wajah 400 ms dengan jeda 60 dtk per orang, Cari Nama (toleran salah ketik), Tamu, status online/antrean; tab "Kehadiran" di detail acara. Diverifikasi: `test:e2e` acara 59 skenario, uji browser 13 skenario (30 absensi + 1 tamu offline lalu sinkron tanpa duplikat, QR dipakai ulang ditolak, /op terbuka offline lewat service worker, wajah dikenali dari kamera palsu dan tersimpan sekali).
 
 ## Keputusan
 <!-- keputusan baru yang tidak ada di HANDOVER, beserta alasannya -->
@@ -57,10 +58,17 @@ Diperbarui oleh agen coding setiap selesai satu tugas.
 - Foto dikecilkan di browser lalu dikonversi ulang di server dengan sharp; file di `UPLOAD_DIR/acara/<id>/`.
 - Dashboard: agregasi dihitung di core per request (data per scope kecil, belum perlu tabel ringkasan). Kelengkapan dihitung atas anggota AKTIF; kontak dianggap terisi bila anggota punya No WA atau wali. Mutasi dibagi masuk/keluar/di dalam relatif terhadap scope pengguna; hari & bulan dikelompokkan dalam WIB.
 - Grafik memakai recharts, gerak memakai `motion` (ringan, tanpa dependensi native). Gauge SVG sendiri (`role="meter"`). Warna seri dari palet dataviz (`--chart-*` di globals.css); batang kategori memakai warna kategorinya.
+- Operator memakai JWT HS256 terpisah dari JWT pengguna (RS256 core) karena diterbitkan acara-svc dan dicabut lewat `OperatorSession.revokedAt`.
+- Server menyimpan satu absensi per (sesi, anggota) dengan `capturedAt` paling awal; kiriman lain dicatat di `AbsensiDuplikat`. Kiriman ulang dengan `clientId` sama dibalas `SUDAH_DITERIMA`.
+- Paket offline memuat embedding VERIFIED dan PENDING (wajah yang baru didaftarkan operator langsung bisa dipakai, ditinjau di fase 5).
+- Backend tfjs dipilih eksplisit: WebGL, bila tidak ada CPU (file .wasm tidak ikut di-host).
+- Service worker hanya aktif di build produksi; `/api` tidak pernah di-cache.
 
 ## Tertunda / masalah
 - Skema wabot belum punya migrasi (fase 7). Model acara untuk fase 3–6 (operator, absensi, wajah, rekap) sudah ikut migrasi awal acara dan bisa berubah.
 - Belum ada UI untuk wali (API sudah ada). Belum ada rate limit login.
-- Riwayat kehadiran per anggota menunggu fase 3.
+- Riwayat kehadiran per anggota dan grafik kehadiran dashboard menunggu rekap (fase 6).
+- Snapshot `PesertaSesi` saat sesi dibuka belum dibuat; paket memakai aturan peserta saat diunduh (fase 4/6).
+- Tawaran "Daftarkan wajah sekarang?" setelah Cari Nama menyusul di fase 5 (enrollment).
 - shadcn/ui di-init manual (components.json, `cn()`, Button); komponen lain ditambah dengan `pnpm dlx shadcn@latest add <nama>` dari apps/web.
 - Celah skema untuk fase 2–6: `Tamu` belum berelasi ke `Sesi`; `Absensi.faceDataId` belum punya foreign key ke `FaceData`.

@@ -8,6 +8,7 @@ import { CoreModule } from './core/core.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { FotoModule } from './foto/foto.module.js';
 import { HealthModule } from './health/health.module.js';
+import { OpModule } from './op/op.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SesiModule } from './sesi/sesi.module.js';
 import { SyncModule } from './sync/sync.module.js';
@@ -23,6 +24,7 @@ import { SyncModule } from './sync/sync.module.js';
     SesiModule,
     FotoModule,
     DashboardModule,
+    OpModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

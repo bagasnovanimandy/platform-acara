@@ -6,3 +6,5 @@ coverage
 **/generated/**
 **/*.md
 infra
+apps/web/public/sw.js
+apps/web/public/models

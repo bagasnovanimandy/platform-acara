@@ -184,8 +184,8 @@ export function AdminDashboard() {
               <CardHeader>
                 <CardTitle>Belum ada data kehadiran</CardTitle>
                 <CardDescription>
-                  Grafik kehadiran per acara dan per kategori muncul di sini setelah fitur absensi
-                  (Fase 3) berjalan.
+                  Grafik kehadiran per acara dan per kategori muncul di sini setelah rekap kehadiran
+                  (Fase 6) tersedia.
                 </CardDescription>
               </CardHeader>
             </Card>

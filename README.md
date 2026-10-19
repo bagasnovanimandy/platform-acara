@@ -10,12 +10,12 @@ Platform acara & absensi ngaji: jadwal, rundown, absensi face recognition offlin
 
 ## Struktur
 ```
-apps/web/            Next.js 15: /admin, /op, /pengurus (placeholder), GET /api/health
+apps/web/            Next.js 15: /admin, /op (PWA operator offline), /pengurus (placeholder), GET /api/health
 services/core/       NestJS core-svc  :3001  (GET /health)
 services/acara/      NestJS acara-svc :3002  (acara, sesi, rundown, PJ, foto)
 services/wabot/      NestJS wabot-svc :3003  (GET /health)
 packages/shared/     normalizeWa(), events.ts (nama event + zod schema)
-packages/face/       wrapper face-api (diisi fase 3)
+packages/face/       wrapper face-api: loadModels, detectOne, pose, matcher, blur
 infra/               docker-compose dev (PostgreSQL 16 + Redis 7)
 docs/                HANDOVER, PROMPTS, PROGRESS
 ```
@@ -37,6 +37,10 @@ Contoh peran lain (password `contoh12345`): `admin.daerah@…`, `admin.selatan@�
 
 Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api/health`.
 `/health` service mengembalikan 503 bila database tidak terhubung.
+
+Operator (`/op`): di detail acara buka tab Kehadiran → "Buka perangkat pintu (uji)", lalu buka tautannya di HP pintu.
+Model wajah disalin otomatis ke `apps/web/public/models` saat `dev`/`build`. Mode offline (service worker) hanya aktif di build produksi (`pnpm build` lalu `next start`).
+`OPERATOR_JWT_SECRET` di `services/acara/.env` wajib diganti di produksi.
 
 Perintah lain: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format`.
 Uji end-to-end core (service harus jalan + data seed): `pnpm --filter @platform-acara/core test:e2e`.
@@ -67,6 +71,8 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `GET|POST /acara/:id/foto`, `GET /foto/:id/file?thumb=1`, `DELETE /foto/:id`
 - `GET /anggota/:id/acara` (acara yang diikuti), `GET /anggota-ref/cari?q=`
 - `GET /dashboard/acara` (statistik acara sesuai wilayah)
+- `POST /sesi/:id/operator/uji` (ADMIN, tautan perangkat pintu sementara), `GET /sesi/:id/kehadiran`
+- Perangkat pintu (token operator, bukan token pengguna): `POST /op/login`, `GET /op/paket`, `POST /op/absensi/batch`, `POST /op/tamu`
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.
