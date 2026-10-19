@@ -9,10 +9,12 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, errorMessage } from '@/lib/api';
+import { acaraApi, api, errorMessage } from '@/lib/api';
 import { canEdit, useAuth } from '@/lib/auth';
 import { formatTanggal, useWilayahTree, wilayahNames } from '@/lib/queries';
 import type { AnggotaDetail, AuditLog } from '@/lib/types';
+import { StatusChip } from '@/components/acara-bits';
+import { type Acara, formatRentang } from '@/lib/acara';
 import { AnggotaFormDialog, MutasiDialog } from '../anggota-form';
 
 const STATUS_VARIANT = { AKTIF: 'secondary', PINDAH: 'outline', NONAKTIF: 'destructive' } as const;
@@ -46,6 +48,10 @@ export default function AnggotaDetailPage({ params }: { params: Promise<{ id: st
   const riwayat = useQuery({
     queryKey: ['anggota', 'riwayat', id],
     queryFn: () => api<AuditLog[]>(`/anggota/${id}/riwayat`),
+  });
+  const acara = useQuery({
+    queryKey: ['acara', 'anggota', id],
+    queryFn: () => acaraApi<Acara[]>(`/anggota/${id}/acara`),
   });
 
   if (anggota.error) return <Alert variant="destructive">{errorMessage(anggota.error)}</Alert>;
@@ -160,6 +166,35 @@ export default function AnggotaDetailPage({ params }: { params: Promise<{ id: st
                       {names.get(m.dariKelompokId) ?? 'kelompok lain'} →{' '}
                       {names.get(m.keKelompokId) ?? 'kelompok lain'}
                       {m.catatan && <span className="text-muted-foreground"> · {m.catatan}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Acara yang diikuti</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {acara.error ? (
+                <Alert variant="destructive">{errorMessage(acara.error)}</Alert>
+              ) : !acara.data?.length ? (
+                <p className="text-sm text-muted-foreground">
+                  {acara.data ? 'Belum termasuk peserta acara mana pun.' : 'Memuat…'}
+                </p>
+              ) : (
+                <ul className="grid gap-2 text-sm">
+                  {acara.data.map((x) => (
+                    <li key={x.id} className="flex flex-wrap items-center gap-2">
+                      <Link href={`/admin/acara/${x.id}`} className="font-medium hover:underline">
+                        {x.nama}
+                      </Link>
+                      <StatusChip status={x.status} />
+                      <span className="w-full text-xs text-muted-foreground">
+                        {formatRentang(x.tanggalMulai, x.tanggalSelesai)}
+                      </span>
                     </li>
                   ))}
                 </ul>

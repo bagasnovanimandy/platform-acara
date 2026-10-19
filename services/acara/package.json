@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",
@@ -18,13 +21,21 @@
     "@platform-acara/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "bullmq": "^6.3.17",
     "dotenv": "^18.0.8",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.12",
+    "nestjs-zod": "^5.5.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
     "@nestjs/schematics": "^11.1.0",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
     "prisma": "^7.10.1"
   }
 }

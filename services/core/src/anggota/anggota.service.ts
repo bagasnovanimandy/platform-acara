@@ -184,6 +184,7 @@ export class AnggotaService {
     const kategori = kategoriIds ? await this.kategoriOrThrow(kategoriIds) : undefined;
     const data = {
       ...fields,
+      updatedAt: new Date(), // kategori ada di tabel lain; tetap tandai berubah untuk resync
       tanggalLahir:
         fields.tanggalLahir === undefined
           ? undefined
@@ -193,7 +194,7 @@ export class AnggotaService {
     };
     const changes = diffFields(
       { ...before, kategori: before.kategori.map((k) => k.nama).sort() },
-      { ...data, kategori: kategori?.map((k) => k.nama).sort() },
+      { ...data, updatedAt: undefined, kategori: kategori?.map((k) => k.nama).sort() },
     );
     await this.prisma.$transaction(async (tx) => {
       await tx.anggota.update({ where: { id }, data });

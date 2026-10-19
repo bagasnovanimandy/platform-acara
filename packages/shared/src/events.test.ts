@@ -26,6 +26,7 @@ describe('events', () => {
       status: 'AKTIF',
       noWa: null,
       waliNoWa: ['6281234567890'],
+      updatedAt: '2026-10-19T04:00:00.000Z',
     });
     expect(payload.kode).toBe('JS-0001');
   });

@@ -28,5 +28,6 @@ export function toAnggotaUpserted(a: AnggotaWithWilayah): EventPayload<'anggota.
     status: a.status,
     noWa: a.noWa,
     waliNoWa: a.wali.map((w) => w.wali.noWa),
+    updatedAt: a.updatedAt.toISOString(),
   };
 }

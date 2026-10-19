@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 
 const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
   { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/acara', label: 'Acara' },
   { href: '/admin/anggota', label: 'Anggota' },
   { href: '/admin/kategori', label: 'Kategori' },
   { href: '/admin/wilayah', label: 'Wilayah' },
@@ -34,7 +35,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/admin" className="font-semibold">
             Platform Acara
@@ -71,7 +72,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }

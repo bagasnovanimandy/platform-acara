@@ -12,7 +12,7 @@ Platform acara & absensi ngaji: jadwal, rundown, absensi face recognition offlin
 ```
 apps/web/            Next.js 15: /admin, /op, /pengurus (placeholder), GET /api/health
 services/core/       NestJS core-svc  :3001  (GET /health)
-services/acara/      NestJS acara-svc :3002  (GET /health)
+services/acara/      NestJS acara-svc :3002  (acara, sesi, rundown, PJ, foto)
 services/wabot/      NestJS wabot-svc :3003  (GET /health)
 packages/shared/     normalizeWa(), events.ts (nama event + zod schema)
 packages/face/       wrapper face-api (diisi fase 3)
@@ -27,7 +27,7 @@ docker compose -f infra/docker-compose.dev.yml up -d
 for s in core acara wabot; do cp services/$s/.env.example services/$s/.env; done
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:generate
-pnpm db:deploy     # terapkan migrasi (saat ini: core_db)
+pnpm db:deploy     # terapkan migrasi (core_db, acara_db)
 pnpm db:seed       # SUPER_ADMIN + wilayah & 40 anggota contoh
 pnpm dev
 ```
@@ -40,10 +40,11 @@ Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api
 
 Perintah lain: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format`.
 Uji end-to-end core (service harus jalan + data seed): `pnpm --filter @platform-acara/core test:e2e`.
+Uji end-to-end acara (core + acara jalan): `pnpm --filter @platform-acara/acara test:e2e`.
 
 Mengubah skema core: edit `services/core/prisma/schema.prisma`, lalu
 `pnpm --filter @platform-acara/core db:migrate --name <nama>`.
-Skema acara & wabot masih draft tanpa migrasi; untuk mencoba, `pnpm --filter @platform-acara/<service> exec prisma db push`.
+Skema acara sama: `pnpm --filter @platform-acara/acara db:migrate --name <nama>`. Skema wabot masih draft tanpa migrasi.
 
 ## API core (ringkas)
 Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi oleh Traefik).
@@ -55,7 +56,17 @@ Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi ol
 - `GET|POST|PATCH /users` (SUPER_ADMIN semua; ADMIN untuk pengguna di dalam wilayahnya)
 - `GET /audit` (riwayat perubahan; ADMIN, AUDITOR, sesuai wilayah)
 - `GET /dashboard/ringkasan` (ADMIN, PENGURUS, AUDITOR), `GET /dashboard/audit` (ADMIN, AUDITOR); sesuai wilayah
-- `GET /internal/anggota?ids=…`, `GET /internal/setting?prefix=…` (header `x-internal-key`)
+- `GET /internal/anggota?ids=…`, `GET /internal/wilayah`, `GET /internal/users?ids=…`, `GET /internal/users/:id/scope`, `GET /internal/setting?prefix=…` (header `x-internal-key`)
+
+## API acara (ringkas)
+Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
+- `GET|POST /acara` (filter `q`, `status`, `tingkat`, `dari`/`sampai`), `GET|PATCH|DELETE /acara/:id`
+- `POST /acara/peserta/preview` (hitung peserta sebelum simpan), `GET /acara/:id/peserta`
+- `POST /acara/:id/sesi`, `PATCH|DELETE /sesi/:id`, `POST /sesi/:id/rundown`, `PUT /sesi/:id/rundown/urutan`, `PATCH|DELETE /rundown/:id`
+- `POST /acara/:id/pj`, `DELETE /acara/:id/pj/:pjId`
+- `GET|POST /acara/:id/foto`, `GET /foto/:id/file?thumb=1`, `DELETE /foto/:id`
+- `GET /anggota/:id/acara` (acara yang diikuti), `GET /anggota-ref/cari?q=`
+- `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.
 

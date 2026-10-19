@@ -6,7 +6,9 @@ dist
 .turbo
 coverage
 /data
+**/data/uploads
 **/src/generated
 next-env.d.ts
 *.tsbuildinfo
 keys/
+.claude/
