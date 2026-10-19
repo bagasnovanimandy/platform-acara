@@ -56,6 +56,11 @@ const sa = await login(SA_EMAIL, SA_PASSWORD);
 const adminSelatan = await login('admin.selatan@platform-acara.local');
 const auditor = await login('auditor@platform-acara.local');
 check('login SA, admin desa, auditor', sa && adminSelatan && auditor);
+// Resync awal acara-svc berjalan di latar saat start; tunggu salinan anggota lengkap dulu.
+check(
+  'sinkron penuh salinan anggota dari core',
+  (await api('POST', '/sync/anggota?full=true', { token: sa })).status === 201,
+);
 
 check('tanpa token → 401', (await api('GET', '/acara')).status === 401);
 check('token palsu → 401', (await api('GET', '/acara', { token: 'abc.def.ghi' })).status === 401);
