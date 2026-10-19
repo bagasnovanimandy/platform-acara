@@ -6,3 +6,6 @@ dist
 .turbo
 coverage
 /data
+**/src/generated
+next-env.d.ts
+*.tsbuildinfo

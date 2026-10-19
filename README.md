@@ -8,26 +8,32 @@ Platform acara & absensi ngaji: jadwal, rundown, absensi face recognition offlin
 3. Kerjakan fase berurutan memakai prompt di **docs/PROMPTS.md**.
 4. Pantau kemajuan di **docs/PROGRESS.md**.
 
-## Isi folder saat ini
+## Struktur
 ```
-AGENTS.md                         aturan untuk Codex / OpenCode / Claude Code
-docs/HANDOVER.md                  dokumen utama
-docs/PROMPTS.md                   prompt siap pakai per fase (0–9)
-docs/PROGRESS.md                  checklist & log
-services/core/prisma/schema.prisma    draft skema core
-services/acara/prisma/schema.prisma   draft skema acara
-services/wabot/prisma/schema.prisma   draft skema bot WA
-services/*/prisma.config.ts       koneksi DB Prisma 7+ (DATABASE_URL dari .env)
-infra/docker-compose.dev.yml      PostgreSQL + Redis untuk dev
-infra/postgres-init.sql           membuat core_db, acara_db, wabot_db
+apps/web/            Next.js 15: /admin, /op, /pengurus (placeholder), GET /api/health
+services/core/       NestJS core-svc  :3001  (GET /health)
+services/acara/      NestJS acara-svc :3002  (GET /health)
+services/wabot/      NestJS wabot-svc :3003  (GET /health)
+packages/shared/     normalizeWa(), events.ts (nama event + zod schema)
+packages/face/       wrapper face-api (diisi fase 3)
+infra/               docker-compose dev (PostgreSQL 16 + Redis 7)
+docs/                HANDOVER, PROMPTS, PROGRESS
 ```
 
-## Langkah pertama
+## Menjalankan (dev)
 ```bash
-git init
+pnpm install
 docker compose -f infra/docker-compose.dev.yml up -d
-# lalu jalankan prompt Fase 0 dari docs/PROMPTS.md di Codex/OpenCode
+for s in core acara wabot; do cp services/$s/.env.example services/$s/.env; done
+pnpm db:generate
+pnpm dev
 ```
+Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api/health`.
+`/health` service mengembalikan 503 bila database tidak terhubung.
+
+Perintah lain: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format`.
+
+Skema Prisma masih draft dan belum punya migrasi. Untuk dev, `pnpm --filter @platform-acara/<service> exec prisma db push` menerapkan skema ke database; migrasi pertama dibuat di fase 1.
 
 ## Prasyarat
-Node.js 22, pnpm 9+, Docker.
+Node.js 22, pnpm 10, Docker.
