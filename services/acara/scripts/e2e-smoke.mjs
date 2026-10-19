@@ -453,6 +453,128 @@ check(
   await waitFor(async () => (await pvLansia()) === sebelum + (punyaLansia ? -1 : 1)),
 );
 
+// --- Perangkat pintu (operator) & absensi offline
+const uji = await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: adminSelatan });
+check(
+  'admin membuat akses perangkat uji',
+  uji.status === 201 && uji.json.url.startsWith('/op/login?t='),
+);
+check(
+  'auditor tidak bisa membuat akses perangkat',
+  (await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: auditor })).status === 403,
+);
+const opLogin = await api('POST', '/op/login', {
+  body: { token: uji.json.token, perangkat: 'e2e' },
+});
+const opToken = opLogin.json.token;
+check(
+  'perangkat login dengan token QR',
+  opLogin.status === 200 && !!opToken && opLogin.json.operator.label === 'Pintu 1',
+);
+check(
+  'token QR sekali pakai',
+  (await api('POST', '/op/login', { body: { token: uji.json.token } })).json.code === 'QR_USED',
+);
+check(
+  'paket tanpa token operator → 401',
+  (await api('GET', '/op/paket', { token: sa })).status === 401,
+);
+const paket = (await api('GET', '/op/paket', { token: opToken })).json;
+check(
+  'paket berisi peserta sesi tanpa data pribadi',
+  paket.peserta?.length === upd.json.jumlahPeserta &&
+    paket.peserta.every((p) => Object.keys(p).sort().join() === 'id,kelompok,kode,nama') &&
+    Array.isArray(paket.wajah) &&
+    paket.threshold === 0.5,
+  JSON.stringify(paket).slice(0, 200),
+);
+const N = Math.min(30, paket.peserta.length);
+const t0 = Date.now();
+const items = paket.peserta.slice(0, N).map((p, i) => ({
+  clientId: crypto.randomUUID(),
+  metode: 'MANUAL',
+  anggotaId: p.id,
+  capturedAt: new Date(t0 + i * 1000).toISOString(),
+}));
+const tamuItem = {
+  clientId: crypto.randomUUID(),
+  metode: 'TAMU',
+  nama: 'Tamu Uji',
+  capturedAt: new Date(t0).toISOString(),
+};
+const b1 = (
+  await api('POST', '/op/absensi/batch', { token: opToken, body: { items: [...items, tamuItem] } })
+).json;
+check(`kirim ${N} absensi + 1 tamu`, b1.ringkas?.baru === N + 1, JSON.stringify(b1.ringkas));
+const b2 = (
+  await api('POST', '/op/absensi/batch', { token: opToken, body: { items: [...items, tamuItem] } })
+).json;
+check(
+  'kirim ulang batch yang sama tidak dobel',
+  b2.ringkas?.sudahDiterima === N + 1 && b2.ringkas.baru === 0,
+);
+const uji2 = (await api('POST', `/sesi/${sesi.id}/operator/uji`, { token: adminSelatan })).json;
+const op2 = (await api('POST', '/op/login', { body: { token: uji2.token } })).json.token;
+const b3 = (
+  await api('POST', '/op/absensi/batch', {
+    token: op2,
+    body: {
+      items: [
+        {
+          clientId: crypto.randomUUID(),
+          metode: 'MANUAL',
+          anggotaId: items[0].anggotaId,
+          capturedAt: new Date(t0 - 60_000).toISOString(),
+        },
+        {
+          clientId: crypto.randomUUID(),
+          metode: 'MANUAL',
+          anggotaId: items[1].anggotaId,
+          capturedAt: new Date(t0 + 60_000).toISOString(),
+        },
+        {
+          clientId: crypto.randomUUID(),
+          metode: 'MANUAL',
+          anggotaId: 'bukan-peserta',
+          capturedAt: new Date(t0).toISOString(),
+        },
+      ],
+    },
+  })
+).json;
+check(
+  'pintu lain: scan lebih awal menggantikan, scan lebih akhir jadi duplikat, bukan peserta ditolak',
+  b3.hasil
+    ?.map((h) => h.status)
+    .sort()
+    .join() === 'DITOLAK,DUPLIKAT,LEBIH_AWAL',
+  JSON.stringify(b3.hasil),
+);
+const kh = (await api('GET', `/sesi/${sesi.id}/kehadiran`, { token: auditor })).json;
+const pertama = kh.items?.find((i) => i.anggota?.id === items[0].anggotaId);
+check(
+  'kehadiran sesi: jumlah hadir, tamu, waktu paling awal, pintu',
+  kh.hadir === N &&
+    kh.tamu === 1 &&
+    pertama?.pintu === 'Pintu 2' &&
+    new Date(pertama.capturedAt).getTime() === t0 - 60_000 &&
+    kh.operator.length === 2,
+  JSON.stringify({ hadir: kh.hadir, tamu: kh.tamu, pertama }),
+);
+check(
+  'paket berikutnya menandai yang sudah hadir',
+  (await api('GET', '/op/paket', { token: opToken })).json.sudahHadir.length === N,
+);
+check(
+  'batch tidak valid → 400',
+  (
+    await api('POST', '/op/absensi/batch', {
+      token: opToken,
+      body: { items: [{ metode: 'MANUAL' }] },
+    })
+  ).status === 400,
+);
+
 // --- Statistik dashboard
 const dSel = await api('GET', '/dashboard/acara', { token: adminSelatan });
 const dSa = (await api('GET', '/dashboard/acara', { token: sa })).json;

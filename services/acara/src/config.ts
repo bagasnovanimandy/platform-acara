@@ -10,6 +10,8 @@ const envSchema = z.object({
   JWT_ISSUER: z.string().default('core-svc'),
   JWT_AUDIENCE: z.string().default('platform-acara'),
   UPLOAD_DIR: z.string().default('data/uploads'),
+  /** Rahasia HS256 untuk token operator (perangkat pintu). Wajib diganti di produksi. */
+  OPERATOR_JWT_SECRET: z.string().min(16).default('dev-operator-secret-ganti-di-produksi'),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

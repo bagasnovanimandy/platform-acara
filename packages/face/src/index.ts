@@ -1,12 +1,20 @@
-// Wrapper @vladmandic/face-api (loadModels, detectOne, estimatePose, createMatcher, blurScore).
-// Diisi pada fase 3 — lihat docs/HANDOVER.md §5.3–5.5.
-
-/** Parameter default deteksi (AGENTS.md → Face recognition). */
-export const FACE_DEFAULTS = {
-  videoWidth: 640,
-  videoHeight: 480,
-  detectIntervalMs: 400,
-  inputSize: 320,
-  scoreThreshold: 0.5,
-  matchThreshold: 0.5,
-} as const;
+// Wrapper @vladmandic/face-api. Komponen web memakai paket ini, bukan face-api langsung.
+export { FACE_DEFAULTS, MODEL_FILES } from './defaults.js';
+export { blurScore, laplacianVariance, toGray } from './blur.js';
+export { type Detection, detectOne, loadModels, modelsReady } from './detect.js';
+export {
+  createMatcher,
+  euclidean,
+  type Match,
+  type Matcher,
+  type MatcherEntry,
+} from './matcher.js';
+export {
+  cocokPose,
+  estimatePose,
+  type Point,
+  type Pose,
+  POSE_AMBANG,
+  POSE_URUTAN,
+  type PoseName,
+} from './pose.js';

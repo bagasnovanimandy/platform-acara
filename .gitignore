@@ -12,3 +12,9 @@ next-env.d.ts
 *.tsbuildinfo
 keys/
 .claude/
+
+# PWA operator: model face-api disalin saat build, service worker hasil build
+apps/web/public/models/
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker*

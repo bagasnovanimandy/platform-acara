@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, use, useEffect, useState } from 'react';
 import { StatusChip, TingkatChip } from '@/components/acara-bits';
 import { KategoriChip } from '@/components/kategori-badge';
+import { KehadiranTab } from '@/components/kehadiran-tab';
 import { SesiEditor } from '@/components/sesi-editor';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ import { cn } from '@/lib/utils';
 
 const TABS = [
   ['sesi', 'Sesi & rundown'],
+  ['kehadiran', 'Kehadiran'],
   ['peserta', 'Peserta'],
   ['pj', 'Penanggung jawab'],
   ['foto', 'Foto'],
@@ -186,6 +188,7 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {tab === 'sesi' && <SesiEditor acara={a} />}
+      {tab === 'kehadiran' && <KehadiranTab acara={a} />}
       {tab === 'peserta' && <PesertaTab acaraId={id} kategori={kategori.data?.items ?? []} />}
       {tab === 'pj' && <PjTab acara={a} />}
       {tab === 'foto' && <FotoTab acara={a} />}
