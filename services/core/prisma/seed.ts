@@ -5,7 +5,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
-import { type KategoriGenerus, PrismaClient } from '../src/generated/prisma/client.js';
+import { PrismaClient } from '../src/generated/prisma/client.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -57,14 +57,16 @@ const NAMA_B = [
   'Kurnia',
 ];
 
-/** Contoh hasil assessment; sebagian sengaja kosong (belum di-assessment). */
-const KATEGORI_DUMMY: (KategoriGenerus | null)[] = [
-  'CABERAWIT',
-  'PRAREMAJA',
-  'REMAJA',
-  'USIA_NIKAH',
-  'REMAJA',
-  null,
+/** Contoh hasil assessment (kode kategori dari migrasi); sebagian sengaja kosong. */
+const KATEGORI_DUMMY: string[][] = [
+  ['CABERAWIT'],
+  ['PRAREMAJA'],
+  ['REMAJA'],
+  ['USIA_NIKAH'],
+  ['DEWASA', 'IBU_IBU'],
+  [],
+  ['LANSIA', 'BAPAK_BAPAK'],
+  ['USIA_MANDIRI'],
 ];
 
 async function main(): Promise<void> {
@@ -112,7 +114,11 @@ async function main(): Promise<void> {
             nama,
             jenisKelamin: jk,
             tanggalLahir: new Date(Date.UTC(tahun, n % 12, (n % 27) + 1)),
-            kategori: KATEGORI_DUMMY[n % KATEGORI_DUMMY.length],
+            kategori: {
+              create: KATEGORI_DUMMY[n % KATEGORI_DUMMY.length]!.map((kode) => ({
+                kategori: { connect: { kode } },
+              })),
+            },
             noWa: tahun <= 2008 ? `62812${String(10000000 + n).padStart(8, '0')}` : null,
             kelompokId: kelompok.id,
           },
@@ -138,6 +144,46 @@ async function main(): Promise<void> {
     await prisma.kodeCounter.upsert({
       where: { desaId: desa.id },
       create: { desaId: desa.id, last },
+      update: {},
+    });
+  }
+
+  // Contoh admin bertingkat & auditor (password sama untuk dev: contoh12345)
+  const contohHash = await argon2.hash('contoh12345', { type: argon2.argon2id });
+  const desaSelatan = await prisma.desa.findUniqueOrThrow({ where: { kode: 'JS' } });
+  const contoh = [
+    {
+      email: 'admin.daerah@platform-acara.local',
+      nama: 'Admin Daerah',
+      role: 'ADMIN',
+      level: 'DAERAH',
+      refId: daerah.id,
+    },
+    {
+      email: 'admin.selatan@platform-acara.local',
+      nama: 'Admin Desa Selatan',
+      role: 'ADMIN',
+      level: 'DESA',
+      refId: desaSelatan.id,
+    },
+    {
+      email: 'auditor@platform-acara.local',
+      nama: 'Auditor Daerah',
+      role: 'AUDITOR',
+      level: 'DAERAH',
+      refId: daerah.id,
+    },
+  ] as const;
+  for (const u of contoh) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      create: {
+        email: u.email,
+        nama: u.nama,
+        role: u.role,
+        passwordHash: contohHash,
+        scopes: { create: { level: u.level, refId: u.refId } },
+      },
       update: {},
     });
   }

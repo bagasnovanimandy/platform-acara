@@ -16,19 +16,12 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   PENGURUS
+  AUDITOR // hanya melihat data & riwayat perubahan di wilayahnya
 }
 
 enum JenisKelamin {
   L
   P
-}
-
-/// Diisi manual per anggota dari assessment tersendiri, bukan dihitung dari umur.
-enum KategoriGenerus {
-  CABERAWIT
-  PRAREMAJA
-  REMAJA
-  USIA_NIKAH
 }
 
 enum StatusAnggota {
@@ -89,25 +82,49 @@ model Kelompok {
 
 /// Alamat sambung = kelompok -> desa -> daerah (diturunkan dari kelompokId)
 model Anggota {
-  id           String          @id @default(cuid())
-  kode         String          @unique // mis. JS-0001
+  id           String            @id @default(cuid())
+  kode         String            @unique // mis. JS-0001
   nama         String
   jenisKelamin JenisKelamin
-  tanggalLahir DateTime?       @db.Date
-  kategori     KategoriGenerus? // null = belum di-assessment
-  noWa         String?         @unique // format 62xxxx
+  tanggalLahir DateTime?         @db.Date
+  kategori     AnggotaKategori[] // diisi manual dari assessment; boleh lebih dari satu
+  noWa         String?           @unique // format 62xxxx
   kelompokId   String
-  kelompok     Kelompok        @relation(fields: [kelompokId], references: [id])
-  status       StatusAnggota   @default(AKTIF)
+  kelompok     Kelompok          @relation(fields: [kelompokId], references: [id])
+  status       StatusAnggota     @default(AKTIF)
   fotoUrl      String?
   wali         AnggotaWali[]
   mutasi       MutasiSambung[]
-  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
 
   @@index([kelompokId])
-  @@index([kategori])
   @@index([nama])
+}
+
+/// Kategori peserta (Caberawit, Remaja, Dewasa, Ibu-ibu, …). Daftar dikelola admin,
+/// lintas wilayah, dan tidak dihitung dari umur.
+model Kategori {
+  id        String            @id @default(cuid())
+  kode      String            @unique // mis. USIA_NIKAH; tetap walau nama diubah
+  nama      String            @unique
+  warna     String            @default("slate") // nama warna palet UI
+  urutan    Int               @default(0)
+  aktif     Boolean           @default(true)
+  anggota   AnggotaKategori[]
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+}
+
+model AnggotaKategori {
+  anggotaId  String
+  anggota    Anggota  @relation(fields: [anggotaId], references: [id])
+  kategoriId String
+  kategori   Kategori @relation(fields: [kategoriId], references: [id])
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([anggotaId, kategoriId])
+  @@index([kategoriId])
 }
 
 model Wali {
@@ -176,20 +193,30 @@ model Setting {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  aksi      String
-  entitas   String
-  entitasId String?
-  data      Json?
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  @@index([entitas, entitasId])
-}
-
 /// Nomor urut terakhir kode anggota per desa (kode = <kodeDesa>-<urut 4 digit>)
 model KodeCounter {
   desaId String @id
   last   Int    @default(0)
+}
+
+/// Riwayat perubahan data (siapa, kapan, apa). Wilayah disimpan untuk filter scope auditor.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  userNama   String
+  aksi       String // CREATE / UPDATE / MUTASI / IMPORT / ...
+  entitas    String // Anggota / Wali / Kelompok / Kategori / User / ...
+  entitasId  String?
+  ringkasan  String
+  data       Json? // { field: [sebelum, sesudah] } atau data tambahan
+  daerahId   String?
+  desaId     String?
+  kelompokId String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entitas, entitasId])
+  @@index([createdAt])
+  @@index([kelompokId])
+  @@index([desaId])
+  @@index([daerahId])
 }

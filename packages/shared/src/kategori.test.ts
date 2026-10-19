@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { parseKategori } from './kategori.js';
+import { kodeKategori, kunciKategori } from './kategori.js';
 
-describe('parseKategori', () => {
+describe('kodeKategori', () => {
   it.each([
-    ['Caberawit', 'CABERAWIT'],
-    ['cabe rawit', 'CABERAWIT'],
-    ['Pra Remaja', 'PRAREMAJA'],
-    ['pra-remaja', 'PRAREMAJA'],
-    ['REMAJA', 'REMAJA'],
-    ['Usia Nikah', 'USIA_NIKAH'],
-    ['usia_nikah', 'USIA_NIKAH'],
-  ])('%s → %s', (input, expected) => {
-    expect(parseKategori(input)).toBe(expected);
+    ['Ibu-ibu', 'IBU_IBU'],
+    ['Usia nikah', 'USIA_NIKAH'],
+    ['  Pra-remaja ', 'PRA_REMAJA'],
+    ['Remaja (SMA)', 'REMAJA_SMA'],
+  ])('%s → %s', (nama, kode) => {
+    expect(kodeKategori(nama)).toBe(kode);
   });
+});
 
-  it('tidak mengenali teks lain', () => {
-    expect(parseKategori('dewasa')).toBeNull();
-    expect(parseKategori('')).toBeNull();
+describe('kunciKategori', () => {
+  it('mengabaikan spasi, tanda hubung, dan huruf besar', () => {
+    expect(kunciKategori('Pra Remaja')).toBe(kunciKategori('pra-remaja'));
+    expect(kunciKategori('USIA_NIKAH')).toBe(kunciKategori('Usia nikah'));
+    expect(kunciKategori('Ibu-ibu')).not.toBe(kunciKategori('Bapak-bapak'));
   });
 });

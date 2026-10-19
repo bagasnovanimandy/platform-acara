@@ -1,65 +1,71 @@
 'use client';
 
-import {
-  KATEGORI_GENERUS,
-  KATEGORI_GENERUS_LABEL,
-  type KategoriGenerus,
-} from '@platform-acara/shared';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import type { Kategori } from '@/lib/types';
 import { KATEGORI_TONE } from './kategori-badge';
 
-const OPTIONS: { value: KategoriGenerus | ''; label: string }[] = [
-  ...KATEGORI_GENERUS.map((k) => ({ value: k, label: KATEGORI_GENERUS_LABEL[k] })),
-  { value: '', label: 'Belum diisi' },
-];
-
 /**
- * Pilihan kategori generus sebagai tombol radio. Nilai dikirim lewat field `name`
- * (string kosong = belum ditentukan), jadi bisa dipakai di form biasa.
+ * Pilih banyak kategori (tombol on/off). Nilai dikirim lewat beberapa field `name`
+ * yang sama, jadi bisa dibaca dengan `FormData.getAll(name)`.
  */
 export function KategoriPicker({
   name,
+  options,
   defaultValue,
 }: {
   name: string;
-  defaultValue: KategoriGenerus | null;
+  options: Kategori[];
+  defaultValue: string[];
 }) {
-  const [value, setValue] = useState<KategoriGenerus | ''>(defaultValue ?? '');
+  const [value, setValue] = useState<string[]>(defaultValue);
+  const aktif = options.filter((o) => o.aktif || value.includes(o.id));
   return (
     <fieldset className="grid gap-2">
-      <legend className="mb-2 text-sm leading-none font-medium">Kategori generus</legend>
+      <legend className="mb-2 text-sm leading-none font-medium">
+        Kategori <span className="font-normal text-muted-foreground">(boleh lebih dari satu)</span>
+      </legend>
       <div className="flex flex-wrap gap-2">
-        {OPTIONS.map((o) => {
-          const checked = value === o.value;
+        {aktif.map((o) => {
+          const checked = value.includes(o.id);
           return (
             <label
-              key={o.value || 'kosong'}
+              key={o.id}
               className={cn(
-                'cursor-pointer rounded-full border px-3 py-1.5 text-sm transition-colors select-none',
+                'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors select-none',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2',
                 checked
-                  ? o.value
-                    ? cn('border-transparent font-medium ring-1 ring-inset', KATEGORI_TONE[o.value])
-                    : 'border-foreground/40 bg-muted font-medium'
+                  ? cn(
+                      'border-transparent font-medium ring-1 ring-inset',
+                      KATEGORI_TONE[o.warna].chip,
+                    )
                   : 'text-muted-foreground hover:bg-muted',
               )}
             >
               <input
-                type="radio"
+                type="checkbox"
                 name={name}
-                value={o.value}
+                value={o.id}
                 checked={checked}
-                onChange={() => setValue(o.value)}
+                onChange={() =>
+                  setValue((v) => (checked ? v.filter((x) => x !== o.id) : [...v, o.id]))
+                }
                 className="sr-only"
               />
-              {o.label}
+              <span
+                aria-hidden
+                className={cn(
+                  'size-2 rounded-full',
+                  checked ? KATEGORI_TONE[o.warna].dot : 'bg-muted-foreground/40',
+                )}
+              />
+              {o.nama}
             </label>
           );
         })}
       </div>
       <p className="text-xs text-muted-foreground">
-        Diisi sesuai hasil assessment, tidak dihitung dari umur.
+        Diisi sesuai hasil assessment, tidak dihitung dari umur. Kosongkan bila belum di-assessment.
       </p>
     </fieldset>
   );

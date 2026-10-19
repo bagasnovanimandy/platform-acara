@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
 import { forbiddenScope, notFound } from '../common/app-error.js';
 import { AnggotaPublisher } from '../anggota/anggota-publisher.service.js';
+import { diffFields } from '../audit/audit.js';
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   canManageDaerah,
@@ -26,6 +28,7 @@ export class WilayahService {
     private readonly prisma: PrismaService,
     private readonly scopes: ScopeService,
     private readonly publisher: AnggotaPublisher,
+    private readonly audit: AuditService,
   ) {}
 
   /** Pohon wilayah yang terlihat oleh user, untuk pilihan bertingkat di web. */
@@ -77,15 +80,25 @@ export class WilayahService {
   }
 
   /** Hanya SUPER_ADMIN (dicek di controller). */
-  createDaerah(dto: CreateDaerahDto) {
-    return this.prisma.daerah.create({ data: dto });
+  async createDaerah(user: AuthUser, dto: CreateDaerahDto) {
+    const row = await this.prisma.daerah.create({ data: dto });
+    await this.audit.record(user, {
+      aksi: 'CREATE',
+      entitas: 'Daerah',
+      entitasId: row.id,
+      ringkasan: `Menambah daerah ${row.nama}`,
+      wilayah: { daerahId: row.id },
+    });
+    return row;
   }
 
   async updateDaerah(user: AuthUser, id: string, dto: UpdateDaerahDto) {
     const scope = await this.scopes.forUser(user);
     await this.mustExist('daerah', id);
     if (!canManageDaerah(scope, id)) throw forbiddenScope();
+    const before = await this.prisma.daerah.findUniqueOrThrow({ where: { id } });
     const row = await this.prisma.daerah.update({ where: { id }, data: dto });
+    await this.recordUpdate(user, 'Daerah', before, dto, { daerahId: id });
     if (dto.nama) await this.publisher.publishWhere({ kelompok: { desa: { daerahId: id } } });
     return row;
   }
@@ -94,14 +107,24 @@ export class WilayahService {
     const scope = await this.scopes.forUser(user);
     await this.mustExist('daerah', dto.daerahId);
     if (!canManageDaerah(scope, dto.daerahId)) throw forbiddenScope();
-    return this.prisma.desa.create({ data: dto });
+    const row = await this.prisma.desa.create({ data: dto });
+    await this.audit.record(user, {
+      aksi: 'CREATE',
+      entitas: 'Desa',
+      entitasId: row.id,
+      ringkasan: `Menambah desa ${row.nama}`,
+      wilayah: { daerahId: row.daerahId, desaId: row.id },
+    });
+    return row;
   }
 
   async updateDesa(user: AuthUser, id: string, dto: UpdateDesaDto) {
     const scope = await this.scopes.forUser(user);
     await this.mustExist('desa', id);
     if (!canManageDesa(scope, id)) throw forbiddenScope();
+    const before = await this.prisma.desa.findUniqueOrThrow({ where: { id } });
     const row = await this.prisma.desa.update({ where: { id }, data: dto });
+    await this.recordUpdate(user, 'Desa', before, dto, { daerahId: row.daerahId, desaId: id });
     if (dto.nama) await this.publisher.publishWhere({ kelompok: { desaId: id } });
     return row;
   }
@@ -110,16 +133,52 @@ export class WilayahService {
     const scope = await this.scopes.forUser(user);
     await this.mustExist('desa', dto.desaId);
     if (!canManageDesa(scope, dto.desaId)) throw forbiddenScope();
-    return this.prisma.kelompok.create({ data: dto });
+    const row = await this.prisma.kelompok.create({ data: dto, include: { desa: true } });
+    await this.audit.record(user, {
+      aksi: 'CREATE',
+      entitas: 'Kelompok',
+      entitasId: row.id,
+      ringkasan: `Menambah kelompok ${row.nama}`,
+      wilayah: { daerahId: row.desa.daerahId, desaId: row.desaId, kelompokId: row.id },
+    });
+    return row;
   }
 
   async updateKelompok(user: AuthUser, id: string, dto: UpdateKelompokDto) {
     const scope = await this.scopes.forUser(user);
     await this.mustExist('kelompok', id);
     if (!canManageKelompok(scope, id)) throw forbiddenScope();
+    const before = await this.prisma.kelompok.findUniqueOrThrow({
+      where: { id },
+      include: { desa: true },
+    });
     const row = await this.prisma.kelompok.update({ where: { id }, data: dto });
+    await this.recordUpdate(user, 'Kelompok', before, dto, {
+      daerahId: before.desa.daerahId,
+      desaId: before.desaId,
+      kelompokId: id,
+    });
     if (dto.nama) await this.publisher.publishWhere({ kelompokId: id });
     return row;
+  }
+
+  private async recordUpdate(
+    user: AuthUser,
+    entitas: string,
+    before: { id: string; nama: string },
+    dto: object,
+    wilayah: { daerahId?: string; desaId?: string; kelompokId?: string },
+  ): Promise<void> {
+    const changes = diffFields(before, dto);
+    if (Object.keys(changes).length === 0) return;
+    await this.audit.record(user, {
+      aksi: 'UPDATE',
+      entitas,
+      entitasId: before.id,
+      ringkasan: `Mengubah ${entitas.toLowerCase()} ${before.nama}`,
+      data: changes,
+      wilayah,
+    });
   }
 
   private async mustExist(level: 'daerah' | 'desa' | 'kelompok', id: string): Promise<void> {

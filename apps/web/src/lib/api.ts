@@ -52,9 +52,11 @@ export function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
+export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'PENGURUS' | 'AUDITOR';
+
 export interface AuthUser {
   id: string;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'PENGURUS';
+  role: Role;
   nama: string;
   email: string;
 }

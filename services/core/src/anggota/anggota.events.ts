@@ -6,6 +6,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 export const anggotaEventInclude = {
   kelompok: { include: { desa: { include: { daerah: true } } } },
   wali: { include: { wali: { select: { noWa: true } } } },
+  kategori: { select: { kategori: { select: { kode: true } } } },
 } satisfies Prisma.AnggotaInclude;
 
 export type AnggotaWithWilayah = Prisma.AnggotaGetPayload<{ include: typeof anggotaEventInclude }>;
@@ -17,7 +18,7 @@ export function toAnggotaUpserted(a: AnggotaWithWilayah): EventPayload<'anggota.
     nama: a.nama,
     jk: a.jenisKelamin,
     tglLahir: toIsoDate(a.tanggalLahir),
-    kategori: a.kategori,
+    kategori: a.kategori.map((k) => k.kategori.kode).sort(),
     kelompokId: a.kelompokId,
     desaId: a.kelompok.desaId,
     daerahId: a.kelompok.desa.daerahId,

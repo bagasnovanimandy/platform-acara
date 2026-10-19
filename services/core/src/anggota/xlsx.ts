@@ -1,4 +1,3 @@
-import { KATEGORI_GENERUS, KATEGORI_GENERUS_LABEL } from '@platform-acara/shared';
 import ExcelJS from 'exceljs';
 import { badRequest } from '../common/app-error.js';
 import {
@@ -66,7 +65,8 @@ export async function readImportXlsx(
   return { rows, firstRow: 2 };
 }
 
-export async function importTemplateXlsx(): Promise<Buffer> {
+/** Template import; sheet kedua berisi daftar kategori yang berlaku. */
+export async function importTemplateXlsx(kategori: string[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Anggota');
   ws.addRow([...IMPORT_COLUMNS]);
@@ -74,7 +74,7 @@ export async function importTemplateXlsx(): Promise<Buffer> {
     'Ahmad Fauzi',
     'L',
     '05/03/2010',
-    'Pra-remaja',
+    kategori.slice(0, 2).join(', '),
     '081234567890',
     '081300001111',
     'Budi Santoso',
@@ -88,15 +88,11 @@ export async function importTemplateXlsx(): Promise<Buffer> {
   for (const col of ['Tgl Lahir', 'No WA', 'No WA Ortu'] as const) {
     ws.getColumn(IMPORT_COLUMNS.indexOf(col) + 1).numFmt = '@';
   }
-  // Pilihan kategori sebagai dropdown; boleh dikosongkan bila belum di-assessment.
-  const kategoriCol = IMPORT_COLUMNS.indexOf('Kategori') + 1;
-  const pilihan = KATEGORI_GENERUS.map((k) => KATEGORI_GENERUS_LABEL[k]).join(',');
-  for (let r = 2; r <= 1000; r++) {
-    ws.getRow(r).getCell(kategoriCol).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [`"${pilihan}"`],
-    };
-  }
+  // Kategori boleh lebih dari satu (pisahkan dengan koma), jadi tidak memakai dropdown.
+  const ref = wb.addWorksheet('Daftar Kategori');
+  ref.addRow(['Kategori yang bisa dipakai (pisahkan dengan koma bila lebih dari satu)']);
+  ref.getRow(1).font = { bold: true };
+  for (const nama of kategori) ref.addRow([nama]);
+  ref.getColumn(1).width = 60;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
