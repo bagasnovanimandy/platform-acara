@@ -1,12 +1,11 @@
-// wabot-svc — bot WA (Baileys), pengajuan izin, log pesan
-// DRAFT: sesuaikan saat implementasi fase 7.
+// wabot-svc — bot WA (Baileys), pengajuan izin, log pesan.
 // State percakapan disimpan di Redis (bot:state:{noWa}, TTL 10 menit), bukan di DB.
-// Auth state Baileys disimpan di volume file (/data/wa-auth).
+// Auth state Baileys disimpan di folder WA_AUTH_DIR (produksi: volume /data/wa-auth).
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = "js"
 }
 
@@ -36,37 +35,61 @@ enum ArahPesan {
   KELUAR
 }
 
-/// Salinan ringkas kontak dari core (event anggota.upserted) untuk mencocokkan nomor
-model KontakRef {
-  noWa      String   @id // 62xxxx
-  tipe      PengajuTipe
-  anggotaIds String[] // ANGGOTA: [dirinya]; WALI: anak-anaknya
-  nama      String
-  syncedAt  DateTime @default(now())
+/// Salinan ringkas anggota dari core (event anggota.upserted) untuk mencocokkan nomor WA
+/// anggota sendiri atau walinya. Hanya data yang dibutuhkan bot.
+model AnggotaRef {
+  id           String   @id // = Anggota.id di core
+  kode         String   @unique
+  nama         String
+  kelompokId   String
+  desaId       String
+  daerahId     String
+  namaKelompok String
+  namaDesa     String
+  status       String
+  noWa         String?
+  waliNoWa     String[]
+  updatedAt    DateTime @db.Timestamptz(3) // dari core, untuk resync
+  syncedAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([noWa])
+  @@index([waliNoWa], type: Gin)
 }
 
 model Izin {
   id              String       @id @default(cuid())
   nomor           Int          @unique @default(autoincrement()) // tampil sebagai IZ-0123
   anggotaId       String
+  /// Salinan saat diajukan (untuk pesan & daftar tanpa memanggil service lain).
+  kodeAnggota     String
   namaAnggota     String
+  kelompokId      String
+  namaKelompok    String
+  namaDesa        String
   pengajuNoWa     String
   pengajuTipe     PengajuTipe
   acaraId         String
-  sesiId          String?
+  acaraNama       String
+  sesiId          String
+  sesiNama        String
+  sesiMulai       DateTime     @db.Timestamptz(3)
   kategori        KategoriIzin
   alasan          String       @db.VarChar(300)
   status          StatusIzin   @default(SUBMITTED)
-  handlerUserIds  String[]     // PJ_IZIN yang menerima
+  /// User core yang diteruskan pengajuan (PJ_IZIN, atau PJ_UMUM bila tidak ada).
+  handlerUserIds  String[]
   decidedBy       String?
-  decidedVia      String?      // WA | WEB
-  decidedAt       DateTime?
-  catatanPengurus String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  decidedByNama   String?
+  decidedVia      String? // WA | WEB
+  decidedAt       DateTime?    @db.Timestamptz(3)
+  catatanPengurus String?      @db.VarChar(300)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
 
-  @@index([anggotaId, acaraId])
+  @@index([anggotaId, sesiId])
   @@index([status])
+  @@index([kelompokId])
+  @@index([pengajuNoWa])
 }
 
 model PesanLog {
@@ -75,7 +98,8 @@ model PesanLog {
   arah      ArahPesan
   isi       String
   izinId    String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([noWa, createdAt])
+  @@index([createdAt])
 }
