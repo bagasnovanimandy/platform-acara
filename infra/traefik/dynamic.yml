@@ -1,0 +1,57 @@
+# Rute Traefik (file provider, tanpa akses docker.sock).
+# /api/core|acara|wabot/* → service masing-masing (prefix dibuang); selain itu → web.
+# /api/*/internal/* tidak boleh dibuka dari luar: endpoint antar-service hanya lewat jaringan internal.
+http:
+  routers:
+    internal-blocked:
+      rule: PathRegexp(`^/api/(core|acara|wabot)/internal(/|$)`)
+      priority: 100
+      entryPoints: [web]
+      middlewares: [tolak-internal]
+      service: noop@internal
+    core:
+      rule: PathPrefix(`/api/core`)
+      priority: 50
+      entryPoints: [web]
+      middlewares: [strip-api]
+      service: core
+    acara:
+      rule: PathPrefix(`/api/acara`)
+      priority: 50
+      entryPoints: [web]
+      middlewares: [strip-api]
+      service: acara
+    wabot:
+      rule: PathPrefix(`/api/wabot`)
+      priority: 50
+      entryPoints: [web]
+      middlewares: [strip-api]
+      service: wabot
+    web:
+      rule: PathPrefix(`/`)
+      priority: 1
+      entryPoints: [web]
+      service: web
+
+  middlewares:
+    strip-api:
+      stripPrefixRegex:
+        regex: ['^/api/(core|acara|wabot)']
+    # Hanya 127.0.0.1 (tidak pernah cocok untuk lalu lintas tunnel) → 403.
+    tolak-internal:
+      ipAllowList:
+        sourceRange: ['127.0.0.1/32']
+
+  services:
+    core:
+      loadBalancer:
+        servers: [{ url: 'http://core:3001' }]
+    acara:
+      loadBalancer:
+        servers: [{ url: 'http://acara:3002' }]
+    wabot:
+      loadBalancer:
+        servers: [{ url: 'http://wabot:3003' }]
+    web:
+      loadBalancer:
+        servers: [{ url: 'http://web:3000' }]

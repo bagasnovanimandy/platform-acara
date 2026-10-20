@@ -1,4 +1,5 @@
 import withSerwistInit from '@serwist/next';
+import { resolve } from 'node:path';
 import type { NextConfig } from 'next';
 
 const coreUrl = process.env.CORE_URL ?? 'http://localhost:3001';
@@ -15,6 +16,10 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // Image Docker (apps/web/Dockerfile) memakai output standalone; dev & CI tidak.
+  ...(process.env.NEXT_OUTPUT === 'standalone'
+    ? { output: 'standalone' as const, outputFileTracingRoot: resolve(process.cwd(), '../..') }
+    : {}),
   transpilePackages: ['@platform-acara/shared', '@platform-acara/face'],
   // face-api membawa jalur Node (require dinamis) yang tidak dipakai di browser.
   webpack(config: { ignoreWarnings?: unknown[] }) {
