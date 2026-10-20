@@ -4,7 +4,9 @@
  * Membuat data uji baru setiap kali (nama/nomor memakai timestamp), jadi aman diulang di DB dev.
  */
 import 'dotenv/config';
+import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
+import { decodeJwt } from 'jose';
 
 const B = process.env.CORE_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
 const INTERNAL_KEY = process.env.INTERNAL_KEY ?? '';
@@ -542,6 +544,100 @@ check(
   (await api('GET', '/dashboard/ringkasan', { token: pg })).status === 200 &&
     (await api('GET', '/dashboard/audit', { token: pg })).status === 403,
 );
+
+// --- Fase 8: impor pengguna SiKU & SSO ---
+{
+  const sikuEmail = `bendahara.${Date.now()}@siku.id`;
+  const sikuHash = await bcrypt.hash('sandiSiku123', 4);
+  const imporBody = {
+    users: [
+      {
+        email: sikuEmail.toUpperCase(),
+        nama: 'Bendahara SiKU',
+        sikuRoles: ['bendahara'],
+        passwordHash: sikuHash,
+      },
+      { email: pengurusEmail, nama: 'Pengurus Uji', sikuRoles: ['ketua'] },
+      {
+        email: `nonaktif.${Date.now()}@siku.id`,
+        nama: 'Lama',
+        sikuRoles: ['auditor'],
+        aktif: false,
+      },
+    ],
+  };
+  const imporSiku = (body) =>
+    fetch(`${B}/internal/siku/users/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-internal-key': INTERNAL_KEY },
+      body: JSON.stringify(body),
+    }).then(async (r) => ({ status: r.status, json: await r.json() }));
+  check(
+    'impor SiKU tanpa kunci internal ditolak',
+    (await api('POST', '/internal/siku/users/import', { body: imporBody })).status === 401,
+  );
+  const dry = await imporSiku({ ...imporBody, dryRun: true });
+  check(
+    'impor SiKU dry run: 1 dibuat, 1 diperbarui, 1 dilewati',
+    dry.status === 200 &&
+      dry.json.dibuat === 1 &&
+      dry.json.diperbarui === 1 &&
+      dry.json.dilewati === 1,
+    JSON.stringify(dry.json),
+  );
+  check('dry run tidak membuat user', !(await login(sikuEmail, 'sandiSiku123')));
+  const imp = await imporSiku(imporBody);
+  check(
+    'impor SiKU dijalankan',
+    imp.status === 200 && imp.json.dibuat === 1,
+    JSON.stringify(imp.json),
+  );
+  check('impor ulang tidak mengubah apa pun', (await imporSiku(imporBody)).json.tetap === 2);
+  const bd = await login(sikuEmail, 'sandiSiku123');
+  check('user SiKU login core dengan password SiKU (bcrypt)', !!bd);
+  check(
+    'password lama di-hash ulang dan tetap bisa dipakai',
+    !!(await login(sikuEmail, 'sandiSiku123')),
+  );
+  const meBd = (await api('GET', '/auth/me', { token: bd })).json;
+  check(
+    'me: role AUDITOR tanpa wilayah + sikuRoles',
+    meBd.role === 'AUDITOR' && meBd.scopes.length === 0 && meBd.sikuRoles.join() === 'bendahara',
+    JSON.stringify(meBd),
+  );
+  check(
+    'auditor hasil impor tidak melihat anggota',
+    (await api('GET', '/anggota', { token: bd })).json.total === 0,
+  );
+  const meSa = (await api('GET', '/auth/me', { token: sa })).json;
+  check('user tanpa peran SiKU: menu SiKU tidak tampil', meSa.sikuTersedia === false);
+  check(
+    'user tanpa peran SiKU tidak bisa minta token SiKU',
+    [403, 404].includes((await api('POST', '/auth/sso/siku', { token: sa })).status),
+  );
+  const sso = await api('POST', '/auth/sso/siku', { token: bd });
+  if (process.env.SIKU_URL) {
+    const token = String(sso.json.url ?? '').split('#token=')[1] ?? '';
+    const claims = token ? decodeJwt(token) : {};
+    check(
+      'token SSO SiKU: aud siku, email, peran, jti',
+      sso.status === 200 &&
+        sso.json.url.startsWith(`${process.env.SIKU_URL.replace(/\/+$/, '')}/sso#token=`) &&
+        claims.aud === 'siku' &&
+        claims.email === sikuEmail &&
+        claims.sikuRoles?.join() === 'bendahara' &&
+        !!claims.jti &&
+        meBd.sikuTersedia === true,
+      JSON.stringify(sso.json),
+    );
+    check(
+      'token SSO tidak bisa dipakai sebagai access token core',
+      (await api('GET', '/auth/me', { token })).status === 401,
+    );
+  } else {
+    check('tanpa SIKU_URL: SSO tidak aktif', sso.status === 404 && meBd.sikuTersedia === false);
+  }
+}
 
 console.log(`\n${pass} lulus, ${fail} gagal`);
 process.exitCode = fail ? 1 : 0;

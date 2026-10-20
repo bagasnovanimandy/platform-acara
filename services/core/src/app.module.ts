@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module.js';
 import { InternalModule } from './internal/internal.module.js';
 import { KategoriModule } from './kategori/kategori.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { SikuModule } from './siku/siku.module.js';
 import { ScopeModule } from './scope/scope.module.js';
 import { UsersModule } from './users/users.module.js';
 import { WaliModule } from './wali/wali.module.js';
@@ -31,6 +32,7 @@ import { WilayahModule } from './wilayah/wilayah.module.js';
     UsersModule,
     DashboardModule,
     InternalModule,
+    SikuModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

@@ -170,6 +170,8 @@ model User {
   role         Role
   anggotaId    String?     @unique // bila user juga anggota
   aktif        Boolean     @default(true)
+  /// Peran user di SiKU (bendahara/ketua/auditor/...). Kosong = tidak punya akses SiKU.
+  sikuRoles    String[]    @default([])
   scopes       UserScope[]
   lastLoginAt  DateTime?   @db.Timestamptz(3)
   createdAt    DateTime    @default(now()) @db.Timestamptz(3)

@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { logout, refreshSession } from '@/lib/api';
 import { type AuthUser } from '@/lib/api';
 import { canAudit, canEdit, ROLE_LABEL, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useJumlahIzin } from '@/lib/izin';
+import { useSikuTersedia } from '@/lib/siku';
 import { useJumlahWajahPending } from '@/lib/wajah';
 
 const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
@@ -30,6 +31,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const wajahPending = useJumlahWajahPending();
   const izinMenunggu = useJumlahIzin();
+  const sikuTersedia = useSikuTersedia();
 
   useEffect(() => {
     if (status === 'unknown') void refreshSession();
@@ -81,6 +83,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            {sikuTersedia && (
+              <Link
+                href="/keuangan"
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                title="Buka SiKU tanpa login ulang"
+                data-testid="nav-siku"
+              >
+                Keuangan (SiKU)
+              </Link>
+            )}
             <span className="text-muted-foreground">
               {user.nama} · {ROLE_LABEL[user.role]}
             </span>
