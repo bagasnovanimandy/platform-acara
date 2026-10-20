@@ -10,6 +10,7 @@ import { AuthImage } from '@/components/auth-image';
 import { KategoriChip } from '@/components/kategori-badge';
 import { KehadiranTab } from '@/components/kehadiran-tab';
 import { PintuTab } from '@/components/pintu-tab';
+import { RekapTab } from '@/components/rekap-tab';
 import { SesiEditor } from '@/components/sesi-editor';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ const TABS = [
   ['sesi', 'Sesi & rundown'],
   ['pintu', 'Pintu'],
   ['kehadiran', 'Kehadiran'],
+  ['rekap', 'Rekap'],
   ['peserta', 'Peserta'],
   ['pj', 'Penanggung jawab'],
   ['foto', 'Foto'],
@@ -57,6 +59,11 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
   const acara = useAcara(id);
   const kategori = useKategori();
   const [tab, setTab] = useState<Tab>('sesi');
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    const ada = TABS.find(([v]) => v === t);
+    if (ada) setTab(ada[0]);
+  }, []);
 
   if (acara.error) return <Alert variant="destructive">{errorMessage(acara.error)}</Alert>;
   const a = acara.data;
@@ -65,15 +72,15 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="flex flex-col gap-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-muted-foreground print:hidden">
         <Link href="/admin/acara" className="hover:underline">
           Acara
         </Link>{' '}
         / {a.nama}
       </nav>
 
-      <section className="flex flex-wrap items-start gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <section className="flex flex-wrap items-start gap-4 print:hidden">
+        <div className="flex min-w-64 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">{a.nama}</h1>
             <StatusChip status={a.status} />
@@ -122,7 +129,7 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 print:hidden">
         <Card className="gap-1 py-4">
           <CardContent className="flex items-center gap-3">
             <Users className="size-5 text-muted-foreground" aria-hidden />
@@ -169,7 +176,7 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
         </Card>
       </div>
 
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b">
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b print:hidden">
         {TABS.map(([v, l]) => (
           <button
             key={v}
@@ -193,6 +200,7 @@ export default function AcaraDetailPage({ params }: { params: Promise<{ id: stri
       {tab === 'sesi' && <SesiEditor acara={a} />}
       {tab === 'pintu' && <PintuTab acara={a} />}
       {tab === 'kehadiran' && <KehadiranTab acara={a} />}
+      {tab === 'rekap' && <RekapTab acara={a} />}
       {tab === 'peserta' && <PesertaTab acaraId={id} kategori={kategori.data?.items ?? []} />}
       {tab === 'pj' && <PjTab acara={a} />}
       {tab === 'foto' && <FotoTab acara={a} />}

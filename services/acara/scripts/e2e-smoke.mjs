@@ -908,6 +908,248 @@ check(
   );
 }
 
+// --- Rekap: tutup sesi, izin, susulan, hitung ulang, ekspor
+{
+  const now = Date.now();
+  const at = (ms) => new Date(ms).toISOString();
+  const acR = (
+    await api('POST', '/acara', {
+      token: adminSelatan,
+      body: {
+        nama: `Rekap Uji ${now % 100000}`,
+        jenis: 'Pengajian desa',
+        tanggalMulai: at(now - 6 * 36e5),
+        tanggalSelesai: at(now + 4 * 36e5),
+        tingkat: 'DESA',
+        wilayah: [{ level: 'DESA', id: selatan.id }],
+      },
+    })
+  ).json;
+  const mulaiA = now - 3 * 36e5;
+  await api('POST', `/acara/${acR.id}/sesi`, {
+    token: adminSelatan,
+    body: { nama: 'Sesi A', mulai: at(mulaiA), selesai: at(now - 36e5), toleransiMenit: 15 },
+  });
+  await api('POST', `/acara/${acR.id}/sesi`, {
+    token: adminSelatan,
+    body: { nama: 'Sesi B', mulai: at(now - 2 * 36e5), selesai: at(now + 36e5) },
+  });
+  const detR = (
+    await api('POST', `/acara/${acR.id}/sesi`, {
+      token: adminSelatan,
+      body: { nama: 'Sesi C', mulai: at(now + 2 * 36e5), selesai: at(now + 3 * 36e5) },
+    })
+  ).json;
+  const [sA, sB, sC] = ['Sesi A', 'Sesi B', 'Sesi C'].map((n) =>
+    detR.sesi.find((x) => x.nama === n),
+  );
+  const pintuA = (
+    await api('POST', `/sesi/${sA.id}/operator/generate`, {
+      token: adminSelatan,
+      body: { jumlah: 1 },
+    })
+  ).json.items[0];
+  const opA = (await api('POST', '/op/login', { body: { token: pintuA.url.split('t=')[1] } })).json
+    .token;
+  const pk = (await api('GET', '/op/paket', { token: opA })).json;
+  const P = pk.peserta;
+  check(
+    'acara rekap punya cukup peserta',
+    P.length >= 10 && P.length === acR.jumlahPeserta,
+    String(P.length),
+  );
+  const absen = (p, ms) => ({
+    clientId: crypto.randomUUID(),
+    metode: 'MANUAL',
+    anggotaId: p.id,
+    capturedAt: at(ms),
+  });
+  await api('POST', '/op/absensi/batch', {
+    token: opA,
+    body: { items: [absen(P[0], mulaiA + 5 * 6e4), absen(P[1], mulaiA + 30 * 6e4)] },
+  });
+  // Izin lewat event dari wabot (fase 7): kirim langsung ke queue acara.
+  const { Queue } = await import('bullmq');
+  const q = new Queue('acara-events', {
+    connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+  });
+  const izin = async (p, kategori, sesiId, status) => {
+    const izinId = `iz-${crypto.randomUUID()}`;
+    await q.add('izin.submitted', {
+      izinId,
+      anggotaId: p.id,
+      acaraId: acR.id,
+      ...(sesiId ? { sesiId } : {}),
+      kategori,
+      alasan: 'uji',
+    });
+    await q.add('izin.decided', {
+      izinId,
+      status,
+      decidedBy: 'pengurus',
+      decidedAt: at(Date.now()),
+    });
+  };
+  await izin(P[2], 'SAKIT', sA.id, 'APPROVED');
+  await izin(P[3], 'IZIN', null, 'APPROVED');
+  await izin(P[4], 'IZIN', sA.id, 'REJECTED');
+  const statusDi = (r, p) => r.items?.find((i) => i.anggota.id === p.id)?.status;
+  let rA;
+  await waitFor(async () => {
+    rA = (await api('GET', `/sesi/${sA.id}/rekap`, { token: adminSelatan })).json;
+    return statusDi(rA, P[2]) === 'SAKIT' && statusDi(rA, P[3]) === 'IZIN';
+  }, 15000);
+  check(
+    'rekap sementara: hadir, terlambat, sakit & izin dari event, izin ditolak = alpha',
+    rA.final === false &&
+      statusDi(rA, P[0]) === 'HADIR' &&
+      rA.items.find((i) => i.anggota.id === P[1].id)?.terlambat === true &&
+      statusDi(rA, P[2]) === 'SAKIT' &&
+      statusDi(rA, P[3]) === 'IZIN' &&
+      statusDi(rA, P[4]) === 'ALPHA' &&
+      rA.ringkas.peserta === P.length &&
+      rA.ringkas.HADIR === 2 &&
+      rA.ringkas.ALPHA === P.length - 4,
+    JSON.stringify(rA.ringkas),
+  );
+  check(
+    'auditor tidak bisa menutup sesi',
+    (await api('POST', `/sesi/${sA.id}/tutup`, { token: auditor })).status === 403,
+  );
+  check(
+    'sesi yang belum mulai tidak bisa ditutup',
+    (await api('POST', `/sesi/${sC.id}/tutup`, { token: adminSelatan })).json.code ===
+      'SESI_BELUM_MULAI',
+  );
+  const tA = await api('POST', `/sesi/${sA.id}/tutup`, { token: adminSelatan });
+  check(
+    'tutup sesi → rekap final sama dengan data uji',
+    tA.status === 200 &&
+      tA.json.final &&
+      tA.json.sesi.status === 'DITUTUP' &&
+      JSON.stringify(tA.json.ringkas) === JSON.stringify(rA.ringkas),
+    JSON.stringify(tA.json.ringkas),
+  );
+  check(
+    'tutup dua kali → 409',
+    (await api('POST', `/sesi/${sA.id}/tutup`, { token: adminSelatan })).status === 409,
+  );
+  const sus = await api('POST', `/sesi/${sA.id}/absensi`, {
+    token: adminSelatan,
+    body: { anggotaId: P[5].id, catatan: 'Lupa scan' },
+  });
+  check(
+    'absensi susulan admin masuk rekap final',
+    sus.status === 200 &&
+      statusDi(sus.json, P[5]) === 'HADIR' &&
+      sus.json.items.find((i) => i.anggota.id === P[5].id).susulan,
+  );
+  check(
+    'susulan untuk yang sudah hadir → 409, bukan peserta → 400',
+    (
+      await api('POST', `/sesi/${sA.id}/absensi`, {
+        token: adminSelatan,
+        body: { anggotaId: P[0].id },
+      })
+    ).status === 409 &&
+      (
+        await api('POST', `/sesi/${sA.id}/absensi`, {
+          token: adminSelatan,
+          body: { anggotaId: 'bukan' },
+        })
+      ).status === 400,
+  );
+  await izin(P[6], 'SAKIT', null, 'APPROVED');
+  check(
+    'izin yang diputuskan setelah sesi ditutup ikut mengubah rekap',
+    await waitFor(
+      async () =>
+        statusDi((await api('GET', `/sesi/${sA.id}/rekap`, { token: adminSelatan })).json, P[6]) ===
+        'SAKIT',
+      15000,
+    ),
+  );
+  await api('POST', '/op/absensi/batch', {
+    token: opA,
+    body: { items: [absen(P[7], mulaiA + 10 * 6e4)] },
+  });
+  rA = (await api('GET', `/sesi/${sA.id}/rekap`, { token: adminSelatan })).json;
+  check(
+    'absensi offline yang tersinkron setelah ditutup ikut masuk',
+    statusDi(rA, P[7]) === 'HADIR',
+  );
+  const hu = await api('POST', `/sesi/${sA.id}/rekap/hitung-ulang`, { token: adminSelatan });
+  check(
+    'hitung ulang tidak mengubah hasil',
+    hu.status === 200 && JSON.stringify(hu.json.ringkas) === JSON.stringify(rA.ringkas),
+  );
+  check(
+    'hitung ulang sesi yang belum ditutup → 400',
+    (await api('POST', `/sesi/${sB.id}/rekap/hitung-ulang`, { token: adminSelatan })).json.code ===
+      'SESI_BELUM_DITUTUP',
+  );
+  const kelX = rA.items[0].anggota.kelompok;
+  const rK = (await api('GET', `/sesi/${sA.id}/rekap?kelompokId=${kelX.id}`, { token: auditor }))
+    .json;
+  check(
+    'filter per kelompok (auditor boleh melihat)',
+    rK.items.length > 0 &&
+      rK.items.every((i) => i.anggota.kelompok.id === kelX.id) &&
+      rK.ringkas.peserta === rA.perKelompok.find((k) => k.id === kelX.id).peserta,
+  );
+  const xl = await fetch(`${B}/sesi/${sA.id}/rekap.xlsx`, {
+    headers: { authorization: `Bearer ${adminSelatan}` },
+  });
+  const ExcelJS = (await import('exceljs')).default;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await xl.arrayBuffer());
+  const ws = wb.getWorksheet('Rekap');
+  const statusXl = [];
+  for (let r = 7; r <= ws.rowCount; r++) statusXl.push(ws.getRow(r).getCell(7).value);
+  check(
+    'ekspor Excel sesi: semua peserta dengan status yang sama',
+    xl.status === 200 &&
+      (xl.headers.get('content-disposition') ?? '').includes('.xlsx') &&
+      statusXl.length === rA.items.length &&
+      statusXl.filter((s) => s === 'HADIR').length === rA.ringkas.HADIR &&
+      !!wb.getWorksheet('Per kelompok'),
+    `${xl.status} ${statusXl.length}`,
+  );
+  const rAc = (await api('GET', `/acara/${acR.id}/rekap`, { token: adminSelatan })).json;
+  const baris0 = rAc.anggota?.find((a) => a.anggota.id === P[3].id);
+  check(
+    'rekap acara: matriks anggota × sesi, izin seluruh acara berlaku di semua sesi',
+    rAc.sesi?.length === 3 &&
+      rAc.sesi[0].final &&
+      !rAc.sesi[1].final &&
+      baris0?.status.join() === 'IZIN,IZIN,IZIN' &&
+      rAc.anggota.length === P.length,
+    JSON.stringify(baris0),
+  );
+  const xa = await fetch(`${B}/acara/${acR.id}/rekap.xlsx?desaId=${selatan.id}`, {
+    headers: { authorization: `Bearer ${adminSelatan}` },
+  });
+  check(
+    'ekspor Excel acara per desa',
+    xa.status === 200 && (await xa.arrayBuffer()).byteLength > 1000,
+  );
+  const riw = (await api('GET', `/anggota/${P[0].id}/kehadiran`, { token: adminSelatan })).json;
+  check(
+    'riwayat kehadiran anggota dari sesi yang sudah ditutup',
+    riw.items?.some((i) => i.sesi.id === sA.id && i.status === 'HADIR') &&
+      !riw.items.some((i) => i.sesi.id === sB.id),
+  );
+  const dk = (await api('GET', '/dashboard/kehadiran', { token: adminSelatan })).json;
+  check(
+    'dashboard kehadiran: sesi terbaru & per bulan',
+    dk.sesiTerbaru?.some((s) => s.id === sA.id && s.ringkas.peserta === rA.ringkas.peserta) &&
+      dk.perBulan?.length === 6 &&
+      dk.perKategori?.length > 0,
+    JSON.stringify(dk).slice(0, 300),
+  );
+  await q.close();
+}
+
 // --- Statistik dashboard
 const dSel = await api('GET', '/dashboard/acara', { token: adminSelatan });
 const dSa = (await api('GET', '/dashboard/acara', { token: sa })).json;

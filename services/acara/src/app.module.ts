@@ -11,6 +11,7 @@ import { FaceModule } from './face/face.module.js';
 import { FotoModule } from './foto/foto.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OpModule } from './op/op.module.js';
+import { RekapModule } from './rekap/rekap.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SesiModule } from './sesi/sesi.module.js';
 import { SyncModule } from './sync/sync.module.js';
@@ -29,6 +30,7 @@ import { SyncModule } from './sync/sync.module.js';
     OpModule,
     EventsModule,
     FaceModule,
+    RekapModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

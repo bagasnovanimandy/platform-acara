@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AKSI_LABEL } from '@/components/riwayat-list';
 import { Alert } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { api, errorMessage } from '@/lib/api';
 import type { AktivitasAudit, Ringkasan } from '@/lib/dashboard-types';
 import { formatWaktu } from '@/lib/queries';
@@ -21,6 +21,7 @@ import {
   WilayahChart,
 } from './charts';
 import { Gauge } from './gauge';
+import { KehadiranStats } from './kehadiran-stats';
 import { Reveal, RevealItem } from './motion';
 
 export function useRingkasan() {
@@ -177,20 +178,11 @@ export function AdminDashboard() {
         <AcaraStats />
       </Section>
 
-      <Section title="Kehadiran">
-        <Reveal>
-          <RevealItem>
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle>Belum ada data kehadiran</CardTitle>
-                <CardDescription>
-                  Grafik kehadiran per acara dan per kategori muncul di sini setelah rekap kehadiran
-                  (Fase 6) tersedia.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </RevealItem>
-        </Reveal>
+      <Section
+        title="Kehadiran"
+        description="Rekap sesi yang sudah ditutup dalam 12 bulan terakhir, sesuai wilayah Anda."
+      >
+        <KehadiranStats />
       </Section>
     </div>
   );
