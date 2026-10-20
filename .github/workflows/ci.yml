@@ -52,7 +52,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run build --filter=@platform-acara/core... --filter=@platform-acara/acara...
+      - run: pnpm turbo run build --filter=@platform-acara/core... --filter=@platform-acara/acara... --filter=@platform-acara/wabot...
       - run: pnpm --filter @platform-acara/core db:deploy
       - run: pnpm --filter @platform-acara/core db:seed
       - name: Create acara_db
@@ -60,6 +60,11 @@ jobs:
       - run: pnpm --filter @platform-acara/acara db:deploy
         env:
           DATABASE_URL: postgresql://app:app@localhost:5432/acara_db
+      - name: Create wabot_db
+        run: PGPASSWORD=app psql -h localhost -U app -d core_db -c 'CREATE DATABASE wabot_db'
+      - run: pnpm --filter @platform-acara/wabot db:deploy
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/wabot_db
       - name: Start core-svc
         working-directory: services/core
         run: |
@@ -78,5 +83,17 @@ jobs:
       - run: pnpm --filter @platform-acara/acara test:e2e
         env:
           DATABASE_URL: postgresql://app:app@localhost:5432/acara_db
+      - name: Start wabot-svc
+        working-directory: services/wabot
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/wabot_db
+          WA_DRIVER: fake
+        run: |
+          node dist/main.js > wabot.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3003/health && exit 0; sleep 1; done
+          cat wabot.log; exit 1
+      - run: pnpm --filter @platform-acara/wabot test:e2e
+        env:
+          DATABASE_URL: postgresql://app:app@localhost:5432/wabot_db
       - if: failure()
-        run: cat services/core/core.log services/acara/acara.log
+        run: cat services/core/core.log services/acara/acara.log services/wabot/wabot.log

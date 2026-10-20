@@ -10,10 +10,10 @@ Platform acara & absensi ngaji: jadwal, rundown, absensi face recognition offlin
 
 ## Struktur
 ```
-apps/web/            Next.js 15: /admin, /op (PWA operator offline), /pengurus (placeholder), GET /api/health
+apps/web/            Next.js 15: /admin, /op (PWA operator offline), GET /api/health
 services/core/       NestJS core-svc  :3001  (GET /health)
 services/acara/      NestJS acara-svc :3002  (acara, sesi, rundown, PJ, foto)
-services/wabot/      NestJS wabot-svc :3003  (GET /health)
+services/wabot/      NestJS wabot-svc :3003  (bot WhatsApp Baileys, izin)
 packages/shared/     normalizeWa(), events.ts (nama event + zod schema)
 packages/face/       wrapper face-api: loadModels, detectOne, pose, matcher, blur
 infra/               docker-compose dev (PostgreSQL 16 + Redis 7)
@@ -27,7 +27,7 @@ docker compose -f infra/docker-compose.dev.yml up -d
 for s in core acara wabot; do cp services/$s/.env.example services/$s/.env; done
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:generate
-pnpm db:deploy     # terapkan migrasi (core_db, acara_db)
+pnpm db:deploy     # terapkan migrasi (core_db, acara_db, wabot_db)
 pnpm db:seed       # SUPER_ADMIN + wilayah & 40 anggota contoh
 pnpm dev
 ```
@@ -43,13 +43,16 @@ Setelah Cari Nama untuk anggota yang belum punya wajah, pintu menawarkan "Daftar
 Model wajah disalin otomatis ke `apps/web/public/models` saat `dev`/`build`. Mode offline (service worker) hanya aktif di build produksi (`pnpm build` lalu `next start`).
 `OPERATOR_JWT_SECRET` di `services/acara/.env` wajib diganti di produksi.
 
+Bot WhatsApp (`services/wabot`): `WA_DRIVER=fake` (bawaan dev) tidak tersambung ke WhatsApp; pesan masuk bisa dicoba dengan `POST /wa/simulasi {noWa, teks}` + header `x-internal-key`. Untuk nomor sungguhan pakai `WA_DRIVER=baileys`, lalu super admin membuka menu WhatsApp di web dan memindai QR dari WhatsApp nomor bot (Perangkat tertaut). Kredensial disimpan di `WA_AUTH_DIR` (produksi: volume `/data/wa-auth`), jangan di-commit. Anggota atau wali mengirim pesan apa saja ke nomor bot untuk membuka menu izin; PJ izin acara (atau pengurus kelompok bila acara tidak punya PJ izin) menerima pengajuan dan membalas `SETUJU 0123` / `TOLAK 0123 <catatan>`, atau memutuskan di menu Izin. Nomor WA pengurus diisi di menu Pengguna.
+
 Perintah lain: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format`.
 Uji end-to-end core (service harus jalan + data seed): `pnpm --filter @platform-acara/core test:e2e`.
 Uji end-to-end acara (core + acara jalan): `pnpm --filter @platform-acara/acara test:e2e`.
+Uji end-to-end bot & izin (core + acara + wabot dengan `WA_DRIVER=fake`): `pnpm --filter @platform-acara/wabot test:e2e`.
 
 Mengubah skema core: edit `services/core/prisma/schema.prisma`, lalu
 `pnpm --filter @platform-acara/core db:migrate --name <nama>`.
-Skema acara sama: `pnpm --filter @platform-acara/acara db:migrate --name <nama>`. Skema wabot masih draft tanpa migrasi.
+Skema acara dan wabot sama: `pnpm --filter @platform-acara/acara db:migrate --name <nama>` (atau `@platform-acara/wabot`).
 
 ## API core (ringkas)
 Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi oleh Traefik).
@@ -78,6 +81,12 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `GET /sesi/:id/rekap`, `GET /acara/:id/rekap` (filter `?kelompokId|desaId|daerahId`), `GET /sesi/:id/rekap.xlsx`, `GET /acara/:id/rekap.xlsx`, `GET /anggota/:id/kehadiran`, `GET /dashboard/kehadiran`
 - `POST /sesi/:id/tutup`, `POST /sesi/:id/rekap/hitung-ulang`, `POST /sesi/:id/absensi` (absen susulan) (ADMIN)
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
+
+## API wabot (ringkas)
+Lewat web: `/api/wabot/*`.
+- `GET /izin?status=&acaraId=&q=`, `GET /izin/jumlah` (ADMIN/PENGURUS/AUDITOR, sesuai wilayah atau penerima pengajuan), `POST /izin/:id/decide {status: APPROVED|REJECTED, catatan?}` (ADMIN/PENGURUS)
+- `GET /wa/status` (ADMIN), `POST /wa/pair` (SUPER_ADMIN, QR baru), `GET /wa/pesan?noWa=` (SUPER_ADMIN, log pesan)
+- `POST /wa/simulasi` (hanya `WA_DRIVER=fake`, header `x-internal-key`), `POST /sync/anggota?full=true` (SUPER_ADMIN)
 
 Error selalu `{ code, message, details? }`.
 

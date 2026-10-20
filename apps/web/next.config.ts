@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 
 const coreUrl = process.env.CORE_URL ?? 'http://localhost:3001';
 const acaraUrl = process.env.ACARA_URL ?? 'http://localhost:3002';
+const wabotUrl = process.env.WABOT_URL ?? 'http://localhost:3003';
 
 // Service worker untuk PWA operator (/op): app shell + model wajah tersedia offline.
 const withSerwist = withSerwistInit({
@@ -20,11 +21,12 @@ const nextConfig: NextConfig = {
     config.ignoreWarnings = [...(config.ignoreWarnings ?? []), { module: /@vladmandic\/face-api/ }];
     return config;
   },
-  // Dev & tanpa gateway: /api/core/* → core-svc, /api/acara/* → acara-svc.
+  // Dev & tanpa gateway: /api/core/* → core-svc, /api/acara/* → acara-svc, /api/wabot/* → wabot-svc.
   async rewrites() {
     return [
       { source: '/api/core/:path*', destination: `${coreUrl}/:path*` },
       { source: '/api/acara/:path*', destination: `${acaraUrl}/:path*` },
+      { source: '/api/wabot/:path*', destination: `${wabotUrl}/:path*` },
     ];
   },
 };

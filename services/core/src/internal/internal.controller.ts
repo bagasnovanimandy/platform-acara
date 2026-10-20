@@ -82,8 +82,46 @@ export class InternalController {
   users(@Query() q: InternalIdsQuery) {
     return this.prisma.user.findMany({
       where: { id: { in: q.ids } },
-      select: { id: true, nama: true, role: true },
+      select: { id: true, nama: true, role: true, noWa: true, aktif: true },
     });
+  }
+
+  /**
+   * Pengurus aktif terdekat untuk satu kelompok: scope kelompok itu, bila tidak ada desanya,
+   * bila tidak ada daerahnya. Tujuan pengajuan izin bila acara tidak punya PJ izin.
+   */
+  @Get('kelompok/:id/pengurus')
+  async pengurusKelompok(@Param('id') id: string) {
+    const k = await this.prisma.kelompok.findUnique({
+      where: { id },
+      select: { id: true, desaId: true, desa: { select: { daerahId: true } } },
+    });
+    if (!k) throw notFound('Kelompok', id);
+    const tingkat = [
+      { level: 'KELOMPOK' as const, refId: k.id },
+      { level: 'DESA' as const, refId: k.desaId },
+      { level: 'DAERAH' as const, refId: k.desa.daerahId },
+    ];
+    for (const t of tingkat) {
+      const users = await this.prisma.user.findMany({
+        where: { role: 'PENGURUS', aktif: true, scopes: { some: t } },
+        select: { id: true, nama: true, role: true, noWa: true, aktif: true },
+        orderBy: { nama: 'asc' },
+      });
+      if (users.length) return users;
+    }
+    return [];
+  }
+
+  /** User dengan nomor WA ini (pengurus yang membalas SETUJU/TOLAK lewat bot). */
+  @Get('users/by-wa/:noWa')
+  async byWa(@Param('noWa') noWa: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { noWa },
+      select: { id: true, nama: true, role: true, aktif: true },
+    });
+    if (!user) throw notFound('User', noWa);
+    return user;
   }
 
   @Get('setting')

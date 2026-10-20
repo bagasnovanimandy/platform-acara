@@ -8,17 +8,20 @@ import { logout, refreshSession } from '@/lib/api';
 import { type AuthUser } from '@/lib/api';
 import { canAudit, canEdit, ROLE_LABEL, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { useJumlahIzin } from '@/lib/izin';
 import { useJumlahWajahPending } from '@/lib/wajah';
 
 const NAV: { href: string; label: string; show?: (u: AuthUser) => boolean }[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/acara', label: 'Acara' },
   { href: '/admin/anggota', label: 'Anggota' },
+  { href: '/admin/izin', label: 'Izin' },
   { href: '/admin/wajah', label: 'Wajah', show: canAudit },
   { href: '/admin/kategori', label: 'Kategori' },
   { href: '/admin/wilayah', label: 'Wilayah' },
   { href: '/admin/pengguna', label: 'Pengguna', show: canEdit },
   { href: '/admin/riwayat', label: 'Riwayat', show: canAudit },
+  { href: '/admin/wa', label: 'WhatsApp', show: canEdit },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -26,6 +29,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const wajahPending = useJumlahWajahPending();
+  const izinMenunggu = useJumlahIzin();
 
   useEffect(() => {
     if (status === 'unknown') void refreshSession();
@@ -55,6 +59,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 )}
               >
                 {n.label}
+                {n.href === '/admin/izin' && !!izinMenunggu && (
+                  <span
+                    className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold text-primary-foreground tabular-nums"
+                    title={`${izinMenunggu} izin menunggu keputusan`}
+                    data-testid="badge-izin"
+                  >
+                    {izinMenunggu}
+                  </span>
+                )}
                 {n.href === '/admin/wajah' && !!wajahPending && (
                   <span
                     className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white tabular-nums"

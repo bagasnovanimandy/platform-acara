@@ -10,6 +10,7 @@ import { EventsModule } from './events/events.module.js';
 import { FaceModule } from './face/face.module.js';
 import { FotoModule } from './foto/foto.module.js';
 import { HealthModule } from './health/health.module.js';
+import { InternalModule } from './internal/internal.module.js';
 import { OpModule } from './op/op.module.js';
 import { RekapModule } from './rekap/rekap.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -31,6 +32,7 @@ import { SyncModule } from './sync/sync.module.js';
     EventsModule,
     FaceModule,
     RekapModule,
+    InternalModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

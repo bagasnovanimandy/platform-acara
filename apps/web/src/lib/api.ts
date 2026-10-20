@@ -4,6 +4,8 @@ import { useAuth } from './auth';
 export const CORE = '/api/core';
 /** Lewat rewrite Next (/api/acara → acara-svc). Token tetap dari core. */
 export const ACARA = '/api/acara';
+/** Lewat rewrite Next (/api/wabot → wabot-svc). */
+export const WABOT = '/api/wabot';
 
 export class ApiError extends Error {
   constructor(
@@ -112,6 +114,11 @@ export function apiStream(path: string, base: string, signal: AbortSignal): Prom
 /** Seperti `api`, tetapi ke acara-svc. */
 export function acaraApi<T>(path: string, init: { method?: string; body?: Body } = {}) {
   return api<T>(path, { ...init, base: ACARA });
+}
+
+/** Seperti `api`, tetapi ke wabot-svc. */
+export function wabotApi<T>(path: string, init: { method?: string; body?: Body } = {}) {
+  return api<T>(path, { ...init, base: WABOT });
 }
 
 export async function login(email: string, password: string): Promise<void> {
