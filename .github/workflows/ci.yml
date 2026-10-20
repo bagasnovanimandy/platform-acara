@@ -44,6 +44,7 @@ jobs:
       DATABASE_URL: postgresql://app:app@localhost:5432/core_db
       REDIS_URL: redis://localhost:6379
       INTERNAL_KEY: ci-internal-key
+      SIKU_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

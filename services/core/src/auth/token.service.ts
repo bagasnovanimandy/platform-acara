@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { jwtVerify, SignJWT, type JWK } from 'jose';
 import { config } from '../config.js';
@@ -57,6 +58,24 @@ export class TokenService implements OnModuleInit {
       nama: String(payload.nama ?? ''),
       email: String(payload.email ?? ''),
     };
+  }
+
+  /**
+   * Token sekali pakai untuk masuk ke SiKU (aud = SIKU_AUDIENCE, berlaku 60 detik).
+   * SiKU memverifikasi lewat JWKS, menolak jti yang sudah dipakai, lalu membuat sesinya sendiri.
+   */
+  async issueSso(user: AuthUser, sikuRoles: string[]): Promise<string> {
+    const cfg = config();
+    const keys = this.requireKeys();
+    return new SignJWT({ typ: 'sso', email: user.email, nama: user.nama, sikuRoles })
+      .setProtectedHeader({ alg: 'RS256', kid: keys.kid })
+      .setSubject(user.id)
+      .setIssuer(cfg.JWT_ISSUER)
+      .setAudience(cfg.SIKU_AUDIENCE)
+      .setJti(randomUUID())
+      .setIssuedAt()
+      .setExpirationTime('60s')
+      .sign(keys.privateKey);
   }
 
   private async sign(user: AuthUser, typ: TokenType, ttl: string): Promise<string> {

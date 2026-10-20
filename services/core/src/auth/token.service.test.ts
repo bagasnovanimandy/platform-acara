@@ -1,3 +1,4 @@
+import { decodeJwt } from 'jose';
 import { describe, expect, it } from 'vitest';
 import { generatePrivateKeyPem, signingKeysFromPem } from './keys.js';
 import { TokenService } from './token.service.js';
@@ -40,5 +41,17 @@ describe('TokenService', () => {
     expect(key).toMatchObject({ kty: 'RSA', alg: 'RS256', use: 'sig' });
     expect(key?.kid).toBeTruthy();
     expect(key).not.toHaveProperty('d');
+  });
+
+  it('token SSO SiKU: aud siku, jti unik, 60 detik, tidak bisa dipakai sebagai access token', async () => {
+    const svc = await service();
+    const a = await svc.issueSso(user, ['bendahara']);
+    const b = await svc.issueSso(user, ['bendahara']);
+    const p = decodeJwt(a);
+    expect(p).toMatchObject({ aud: 'siku', typ: 'sso', email: 'a@x.id', sikuRoles: ['bendahara'] });
+    expect((p.exp ?? 0) - (p.iat ?? 0)).toBe(60);
+    expect(p.jti).toBeTruthy();
+    expect(p.jti).not.toBe(decodeJwt(b).jti);
+    await expect(svc.verify(a, 'access')).rejects.toThrow();
   });
 });

@@ -57,6 +57,7 @@ Skema acara dan wabot sama: `pnpm --filter @platform-acara/acara db:migrate --na
 ## API core (ringkas)
 Lewat web: `/api/core/*` diteruskan ke core-svc (rewrite Next.js; di produksi oleh Traefik).
 - `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `GET /auth/.well-known/jwks.json`
+- `POST /auth/sso/siku` (URL masuk SiKU sekali pakai), `POST /internal/siku/users/import` (impor pengguna SiKU); lihat [docs/SIKU.md](docs/SIKU.md)
 - `GET /wilayah/tree`, `GET|POST|PATCH /wilayah/daerah|desa|kelompok`
 - `GET|POST|PATCH /anggota` (filter `kategoriId`, `BELUM` = tanpa kategori), `GET /anggota/:id/riwayat`, `POST /anggota/:id/mutasi`, `POST /anggota/import?dryRun=true`, `GET /anggota/import/template`
 - `GET|POST|PATCH /wali`, `POST /wali/:id/anak`
