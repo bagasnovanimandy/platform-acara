@@ -91,5 +91,8 @@ Lewat web: `/api/wabot/*`.
 
 Error selalu `{ code, message, details? }`.
 
+## Deploy
+Produksi (home lab, Docker Compose + Traefik + Cloudflare Tunnel): [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Prasyarat
 Node.js 22, pnpm 10, Docker.

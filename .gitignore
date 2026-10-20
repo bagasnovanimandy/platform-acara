@@ -19,3 +19,5 @@ apps/web/public/models/
 apps/web/public/sw.js
 apps/web/public/sw.js.map
 apps/web/public/swe-worker*
+.env.*
+!.env*.example

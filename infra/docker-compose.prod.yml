@@ -1,0 +1,189 @@
+# Produksi home lab: docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d --build
+# Langkah lengkap: docs/DEPLOY.md. Anggaran RAM ±2,9 GB (HANDOVER §9).
+name: platform-acara
+
+x-node: &node
+  restart: unless-stopped
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  networks: [internal]
+  logging: &log
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+
+x-env: &env
+  NODE_ENV: production
+  REDIS_URL: redis://redis:6379
+  INTERNAL_KEY: ${INTERNAL_KEY:?isi INTERNAL_KEY}
+  CORE_URL: http://core:3001
+  ACARA_URL: http://acara:3002
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    command: ['postgres', '-c', 'shared_buffers=256MB', '-c', 'max_connections=60']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ${DATA_DIR:-/data}/backup:/backup
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app']
+      interval: 10s
+      retries: 10
+    mem_limit: 1g
+    networks: [internal]
+    logging: *log
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      ['redis-server', '--appendonly', 'yes', '--maxmemory', '128mb', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      retries: 10
+    mem_limit: 160m
+    networks: [internal]
+    logging: *log
+
+  # Migrasi database sekali jalan sebelum service dimulai (image yang sama dengan service-nya).
+  core-migrate:
+    image: platform-acara/core:${TAG:-latest}
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/core_db
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [internal]
+    restart: 'no'
+  acara-migrate:
+    image: platform-acara/acara:${TAG:-latest}
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/acara_db
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [internal]
+    restart: 'no'
+  wabot-migrate:
+    image: platform-acara/wabot:${TAG:-latest}
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/wabot_db
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [internal]
+    restart: 'no'
+
+  core:
+    <<: *node
+    image: platform-acara/core:${TAG:-latest}
+    build: { context: .., dockerfile: services/core/Dockerfile }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      core-migrate: { condition: service_completed_successfully }
+    environment:
+      <<: *env
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/core_db
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt-private.pem
+      SIKU_URL: ${SIKU_URL:-}
+      SIKU_AUDIENCE: ${SIKU_AUDIENCE:-siku}
+      NODE_OPTIONS: --max-old-space-size=192
+    volumes:
+      - ${DATA_DIR:-/data}/secrets/jwt-private.pem:/run/secrets/jwt-private.pem:ro
+    mem_limit: 256m
+
+  acara:
+    <<: *node
+    image: platform-acara/acara:${TAG:-latest}
+    build: { context: .., dockerfile: services/acara/Dockerfile }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      acara-migrate: { condition: service_completed_successfully }
+      core: { condition: service_healthy }
+    environment:
+      <<: *env
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/acara_db
+      OPERATOR_JWT_SECRET: ${OPERATOR_JWT_SECRET:?isi OPERATOR_JWT_SECRET}
+      UPLOAD_DIR: /data/uploads
+      NODE_OPTIONS: --max-old-space-size=256
+    volumes:
+      - ${DATA_DIR:-/data}/uploads:/data/uploads
+    mem_limit: 320m
+
+  wabot:
+    <<: *node
+    image: platform-acara/wabot:${TAG:-latest}
+    build: { context: .., dockerfile: services/wabot/Dockerfile }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      wabot-migrate: { condition: service_completed_successfully }
+      core: { condition: service_healthy }
+    environment:
+      <<: *env
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/wabot_db
+      WA_DRIVER: ${WA_DRIVER:-baileys}
+      WA_AUTH_DIR: /data/wa-auth
+      NODE_OPTIONS: --max-old-space-size=192
+    volumes:
+      - ${DATA_DIR:-/data}/wa-auth:/data/wa-auth
+    mem_limit: 256m
+
+  web:
+    image: platform-acara/web:${TAG:-latest}
+    build: { context: .., dockerfile: apps/web/Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_OPTIONS: --max-old-space-size=256
+    depends_on: { core: { condition: service_healthy } }
+    mem_limit: 384m
+    networks: [internal]
+    logging: *log
+
+  # Satu-satunya pintu masuk HTTP. Tidak membuka port ke host; Cloudflare Tunnel yang mengakses.
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --ping=true
+      - --log.level=WARN
+      - --accesslog=false
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 30s
+      retries: 3
+    depends_on: [web, core, acara, wabot]
+    mem_limit: 64m
+    networks: [internal]
+    logging: *log
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?isi CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [traefik]
+    mem_limit: 64m
+    networks: [internal]
+    logging: *log
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  internal:

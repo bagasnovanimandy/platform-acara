@@ -98,3 +98,26 @@ jobs:
           DATABASE_URL: postgresql://app:app@localhost:5432/wabot_db
       - if: failure()
         run: cat services/core/core.log services/acara/acara.log services/wabot/wabot.log
+
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [services/core, services/acara, services/wabot, apps/web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validasi compose produksi
+        if: matrix.app == 'services/core'
+        run: |
+          cp infra/.env.prod.example infra/.env.prod
+          sed -i 's/^\(POSTGRES_PASSWORD\|INTERNAL_KEY\|OPERATOR_JWT_SECRET\|CLOUDFLARE_TUNNEL_TOKEN\)=$/\1=ci/' infra/.env.prod
+          docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod config --quiet
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.app }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

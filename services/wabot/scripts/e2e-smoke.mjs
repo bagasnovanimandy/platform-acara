@@ -7,7 +7,7 @@ import 'dotenv/config';
 
 const CORE = process.env.CORE_URL ?? 'http://localhost:3001';
 const ACARA = process.env.ACARA_URL ?? 'http://localhost:3002';
-const WABOT = `http://localhost:${process.env.PORT ?? 3003}`;
+const WABOT = process.env.WABOT_URL ?? `http://localhost:${process.env.PORT ?? 3003}`;
 const KEY = process.env.INTERNAL_KEY ?? '';
 let pass = 0,
   fail = 0;
