@@ -6,6 +6,7 @@ import type { AuthUser } from '../auth/auth.types.js';
 import { AppError, notFound } from '../common/app-error.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RekapService } from '../rekap/rekap.service.js';
 import { QR_BERLAKU_MS } from './kredensial.js';
 import { MonitorBus } from './monitor-bus.js';
 import type { AbsensiItem, OpLoginDto } from './op.dto.js';
@@ -31,6 +32,7 @@ export class OpService {
     private readonly prisma: PrismaService,
     private readonly acara: AcaraService,
     private readonly bus: MonitorBus,
+    private readonly rekap: RekapService,
   ) {}
 
   /** Login perangkat dengan token QR (sekali pakai, 24 jam) atau kode pintu + PIN. */
@@ -206,6 +208,7 @@ export class OpService {
     });
     this.bus.emit(op.sesiId);
     const hitung = (s: HasilStatus) => hasil.filter((h) => h.status === s).length;
+    if (hitung('BARU') + hitung('LEBIH_AWAL') > 0) await this.rekap.perbaruiJikaDitutup(op.sesiId);
     return {
       hasil,
       ringkas: {

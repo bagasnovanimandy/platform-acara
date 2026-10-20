@@ -11,11 +11,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { acaraApi, api, errorMessage } from '@/lib/api';
 import { canEdit, useAuth } from '@/lib/auth';
-import { formatTanggal, useWilayahTree, wilayahNames } from '@/lib/queries';
+import { formatTanggal, formatWaktu, useWilayahTree, wilayahNames } from '@/lib/queries';
 import type { AnggotaDetail, AuditLog } from '@/lib/types';
 import { StatusChip } from '@/components/acara-bits';
 import { type Acara, formatRentang } from '@/lib/acara';
+import { BatangStatus, StatusChip as StatusRekapChip } from '@/components/rekap-tab';
+import { persen, type Ringkasan, type StatusRekap } from '@/lib/rekap';
 import { AnggotaFormDialog, MutasiDialog } from '../anggota-form';
+
+interface RiwayatKehadiran {
+  ringkas: Ringkasan;
+  items: {
+    sesi: { id: string; nama: string; mulai: string };
+    acara: { id: string; nama: string };
+    status: StatusRekap;
+    terlambat: boolean;
+  }[];
+}
 
 const STATUS_VARIANT = { AKTIF: 'secondary', PINDAH: 'outline', NONAKTIF: 'destructive' } as const;
 
@@ -52,6 +64,11 @@ export default function AnggotaDetailPage({ params }: { params: Promise<{ id: st
   const acara = useQuery({
     queryKey: ['acara', 'anggota', id],
     queryFn: () => acaraApi<Acara[]>(`/anggota/${id}/acara`),
+  });
+
+  const kehadiran = useQuery({
+    queryKey: ['rekap', 'anggota', id],
+    queryFn: () => acaraApi<RiwayatKehadiran>(`/anggota/${id}/kehadiran`),
   });
 
   if (anggota.error) return <Alert variant="destructive">{errorMessage(anggota.error)}</Alert>;
@@ -198,6 +215,55 @@ export default function AnggotaDetailPage({ params }: { params: Promise<{ id: st
                     </li>
                   ))}
                 </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Riwayat kehadiran</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {kehadiran.error ? (
+                <p className="text-sm text-muted-foreground">Belum ada data kehadiran.</p>
+              ) : !kehadiran.data?.items.length ? (
+                <p className="text-sm text-muted-foreground">
+                  {kehadiran.data ? 'Belum ada sesi yang ditutup.' : 'Memuat…'}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="font-medium">
+                        {persen(kehadiran.data.ringkas.persenHadir)} hadir
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {kehadiran.data.ringkas.HADIR} hadir · {kehadiran.data.ringkas.IZIN} izin ·{' '}
+                        {kehadiran.data.ringkas.SAKIT} sakit · {kehadiran.data.ringkas.ALPHA} alpha
+                      </span>
+                    </div>
+                    <BatangStatus r={kehadiran.data.ringkas} />
+                  </div>
+                  <ul className="divide-y text-sm" data-testid="riwayat-kehadiran">
+                    {kehadiran.data.items.slice(0, 20).map((x) => (
+                      <li key={x.sesi.id} className="flex items-center gap-2 py-2">
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/admin/acara/${x.acara.id}?tab=rekap`}
+                            className="font-medium hover:underline"
+                          >
+                            {x.acara.nama}
+                          </Link>
+                          <div className="text-xs text-muted-foreground">
+                            {x.sesi.nama} · {formatWaktu(x.sesi.mulai)}
+                            {x.terlambat && ' · terlambat'}
+                          </div>
+                        </div>
+                        <StatusRekapChip status={x.status} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -5,6 +5,7 @@ import { Redis } from 'ioredis';
 import { CoreClient } from '../core/core.client.js';
 import { config } from '../config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RekapService } from '../rekap/rekap.service.js';
 import { toAnggotaRef } from './anggota-sync.js';
 
 /**
@@ -21,6 +22,7 @@ export class SyncService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly core: CoreClient,
+    private readonly rekap: RekapService,
   ) {}
 
   onModuleInit(): void {
@@ -52,6 +54,34 @@ export class SyncService implements OnModuleInit, OnModuleDestroy {
       // Wilayah baru datang lewat anggota.upserted berikutnya; cukup dicatat.
       const e = parseEvent(EVENTS.ANGGOTA_MUTASI, data);
       this.logger.log(`Mutasi ${e.anggotaId}: ${e.dariKelompokId} → ${e.keKelompokId}`);
+    } else if (name === EVENTS.IZIN_SUBMITTED) {
+      const e = parseEvent(EVENTS.IZIN_SUBMITTED, data);
+      await this.prisma.izinRef.upsert({
+        where: { id: e.izinId },
+        create: {
+          id: e.izinId,
+          anggotaId: e.anggotaId,
+          acaraId: e.acaraId,
+          sesiId: e.sesiId ?? null,
+          kategori: e.kategori,
+          status: 'SUBMITTED',
+        },
+        // Keputusan bisa datang lebih dulu: jangan timpa statusnya.
+        update: {
+          anggotaId: e.anggotaId,
+          acaraId: e.acaraId,
+          sesiId: e.sesiId ?? null,
+          kategori: e.kategori,
+        },
+      });
+    } else if (name === EVENTS.IZIN_DECIDED) {
+      const e = parseEvent(EVENTS.IZIN_DECIDED, data);
+      const izin = await this.prisma.izinRef.findUnique({ where: { id: e.izinId } });
+      // izin.submitted belum diterima: lempar agar BullMQ mencoba lagi nanti.
+      if (!izin) throw new Error(`IzinRef ${e.izinId} belum ada`);
+      await this.prisma.izinRef.update({ where: { id: e.izinId }, data: { status: e.status } });
+      // Izin yang diputuskan setelah sesi ditutup ikut mengubah rekap.
+      await this.rekap.hitungUlangIzin(izin.acaraId, izin.sesiId);
     }
   }
 

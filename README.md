@@ -75,6 +75,8 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `POST /sesi/:id/operator/generate {jumlah}` (ADMIN), `GET /sesi/:id/operator`, `GET /sesi/:id/monitor` (SSE), `POST /operator/:id/revoke|reset-pin` (ADMIN), `GET /sesi/:id/kehadiran`
 - Perangkat pintu (token operator, bukan token pengguna): `POST /op/login {token}` atau `{kode, pin}`, `GET /op/paket`, `POST /op/heartbeat`, `POST /op/absensi/batch`, `POST /op/tamu`, `POST /op/face/enroll`
 - `GET /face/pending`, `GET /face/pending/jumlah`, `GET /face/pending/stream` (SSE), `GET /face/:id`, `GET /face/:id/thumb/:i`, `POST /face/:id/verify|reject|reassign` (ADMIN, sesuai wilayah anggota)
+- `GET /sesi/:id/rekap`, `GET /acara/:id/rekap` (filter `?kelompokId|desaId|daerahId`), `GET /sesi/:id/rekap.xlsx`, `GET /acara/:id/rekap.xlsx`, `GET /anggota/:id/kehadiran`, `GET /dashboard/kehadiran`
+- `POST /sesi/:id/tutup`, `POST /sesi/:id/rekap/hitung-ulang`, `POST /sesi/:id/absensi` (absen susulan) (ADMIN)
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.

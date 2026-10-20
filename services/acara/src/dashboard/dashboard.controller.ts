@@ -13,4 +13,10 @@ export class DashboardController {
   acara(@CurrentUser() user: AuthUser) {
     return this.dashboard.acara(user);
   }
+
+  @Get('kehadiran')
+  @Roles('ADMIN', 'PENGURUS', 'AUDITOR')
+  kehadiran(@CurrentUser() user: AuthUser) {
+    return this.dashboard.kehadiran(user);
+  }
 }
