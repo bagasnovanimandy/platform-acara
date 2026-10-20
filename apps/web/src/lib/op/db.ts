@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { AntreanItem, Paket } from './types';
+import type { AntreanItem, Paket, WajahLokal } from './types';
 
 export interface PaketRow {
   sesiId: string;
@@ -36,6 +36,7 @@ export const db = new Dexie('platform-acara-op') as Dexie & {
   antrean: EntityTable<AntreanRow, 'clientId'>;
   hadir: EntityTable<HadirRow, 'key'>;
   ditolak: EntityTable<DitolakRow, 'clientId'>;
+  wajah: EntityTable<WajahLokal, 'clientId'>;
 };
 
 db.version(1).stores({
@@ -44,3 +45,5 @@ db.version(1).stores({
   hadir: 'key, sesiId',
   ditolak: 'clientId, sesiId',
 });
+
+db.version(2).stores({ wajah: 'clientId, sesiId' });

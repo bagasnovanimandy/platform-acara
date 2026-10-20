@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, use, useEffect, useState } from 'react';
 import { StatusChip, TingkatChip } from '@/components/acara-bits';
+import { AuthImage } from '@/components/auth-image';
 import { KategoriChip } from '@/components/kategori-badge';
 import { KehadiranTab } from '@/components/kehadiran-tab';
 import { PintuTab } from '@/components/pintu-tab';
@@ -33,7 +34,7 @@ import {
   type Peserta,
   useAcara,
 } from '@/lib/acara';
-import { ACARA, acaraApi, api, apiBlob, errorMessage } from '@/lib/api';
+import { acaraApi, api, errorMessage } from '@/lib/api';
 import { ROLE_LABEL } from '@/lib/auth';
 import { useKategori } from '@/lib/queries';
 import type { Kategori, Paginated, UserRow } from '@/lib/types';
@@ -543,25 +544,4 @@ function FotoTab({ acara }: { acara: AcaraDetail }) {
       )}
     </div>
   );
-}
-
-/** Gambar yang butuh token: diambil sebagai blob lalu ditampilkan lewat object URL. */
-function AuthImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let url: string | null = null;
-    let alive = true;
-    void apiBlob(path, ACARA).then((b) => {
-      if (!alive) return;
-      url = URL.createObjectURL(b);
-      setSrc(url);
-    });
-    return () => {
-      alive = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [path]);
-  if (!src) return <div className={cn('aspect-square w-full animate-pulse bg-muted', className)} />;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className={cn('aspect-square w-full object-cover', className)} />;
 }

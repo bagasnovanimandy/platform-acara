@@ -40,3 +40,11 @@ export function blurScore(source: CanvasImageSource, width: number, height: numb
   const { data } = ctx.getImageData(0, 0, w, h);
   return laplacianVariance(toGray(data, w, h), w, h);
 }
+
+/** Rata-rata kecerahan (0–255) citra abu-abu. */
+export function kecerahan(gray: ArrayLike<number>): number {
+  if (gray.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < gray.length; i++) sum += gray[i]!;
+  return sum / gray.length;
+}

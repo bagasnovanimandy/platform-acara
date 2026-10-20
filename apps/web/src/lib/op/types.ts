@@ -61,3 +61,24 @@ export interface HasilBatch {
     alasan?: string;
   }[];
 }
+
+/** Wajah yang didaftarkan di perangkat ini (antrean kirim + dipakai pencocokan sampai paket berikutnya). */
+export interface WajahLokal {
+  clientId: string;
+  sesiId: string;
+  anggotaId: string;
+  descriptors: number[][];
+  /** Data URL WebP 160 px, dikosongkan setelah terkirim. */
+  thumbnails: string[];
+  capturedAt: string;
+  /** Id FaceData di server setelah terkirim. */
+  serverId: string | null;
+  terkirimAt: string | null;
+}
+
+export interface HasilEnroll {
+  id: string;
+  anggotaId: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  baru: boolean;
+}

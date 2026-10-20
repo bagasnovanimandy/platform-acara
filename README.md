@@ -39,6 +39,7 @@ Cek: `curl localhost:3001/health` (juga 3002, 3003) dan `curl localhost:3000/api
 `/health` service mengembalikan 503 bila database tidak terhubung.
 
 Operator (`/op`): di detail acara buka tab Pintu → isi jumlah → "Buat pintu", lalu cetak kartu. HP pintu memindai QR (sekali pakai, 24 jam) atau membuka `/op` dan mengisi kode pintu + PIN. Tab Pintu juga memantau tiap perangkat secara langsung.
+Setelah Cari Nama untuk anggota yang belum punya wajah, pintu menawarkan "Daftarkan wajah" (5 pose otomatis); wajah langsung dipakai dan menunggu verifikasi admin di menu Wajah.
 Model wajah disalin otomatis ke `apps/web/public/models` saat `dev`/`build`. Mode offline (service worker) hanya aktif di build produksi (`pnpm build` lalu `next start`).
 `OPERATOR_JWT_SECRET` di `services/acara/.env` wajib diganti di produksi.
 
@@ -72,7 +73,8 @@ Lewat web: `/api/acara/*` → acara-svc. Token sama dengan core.
 - `GET /anggota/:id/acara` (acara yang diikuti), `GET /anggota-ref/cari?q=`
 - `GET /dashboard/acara` (statistik acara sesuai wilayah)
 - `POST /sesi/:id/operator/generate {jumlah}` (ADMIN), `GET /sesi/:id/operator`, `GET /sesi/:id/monitor` (SSE), `POST /operator/:id/revoke|reset-pin` (ADMIN), `GET /sesi/:id/kehadiran`
-- Perangkat pintu (token operator, bukan token pengguna): `POST /op/login {token}` atau `{kode, pin}`, `GET /op/paket`, `POST /op/heartbeat`, `POST /op/absensi/batch`, `POST /op/tamu`
+- Perangkat pintu (token operator, bukan token pengguna): `POST /op/login {token}` atau `{kode, pin}`, `GET /op/paket`, `POST /op/heartbeat`, `POST /op/absensi/batch`, `POST /op/tamu`, `POST /op/face/enroll`
+- `GET /face/pending`, `GET /face/pending/jumlah`, `GET /face/pending/stream` (SSE), `GET /face/:id`, `GET /face/:id/thumb/:i`, `POST /face/:id/verify|reject|reassign` (ADMIN, sesuai wilayah anggota)
 - `POST /sync/anggota?full=true` (SUPER_ADMIN, sinkron ulang salinan anggota)
 
 Error selalu `{ code, message, details? }`.
